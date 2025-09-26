@@ -4,7 +4,7 @@ export default function ReminderDo() {
   const [reminders] = useState([
     {
       id: 1,
-      nama: "Darren Cardino",
+      nama: "Haffydzzh Al Fayyadh",
       tglMulai: "2025-09-05",
       tglSelesai: "2025-09-05",
       jamMulai: "09:00",
