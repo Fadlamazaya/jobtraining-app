@@ -23,12 +23,11 @@ import ApprovalPage from "./pages/HalamanAdmintr/ApprovalPage";
 function App() {
   return (
     <Routes>
-      <Route path="/Dashboard" element={<MainLayout />}>
-        {/* default redirect */}
-        <Route index element={<Navigate to="/Dashboard" replace />} />
+      <Route path="/" element={<MainLayout />}>
+      
 
         {/* child routes */}
-        <Route path="Dashboard" element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="Reminder" element={<Reminder />} />
         <Route path="Kompetensi" element={<Kompetensi />} />
         <Route path="Reminder/FO" element={<ReminderFo />} />

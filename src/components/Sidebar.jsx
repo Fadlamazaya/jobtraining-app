@@ -28,8 +28,8 @@ const Sidebar = () => {
         {/* Dashboard */}
         <div className="mb-6 space-y-2">
           <NavLink
-            to="/Dashboard"
-            className={`flex items-center gap-4 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive("/Dashboard")
+            to="/dashboard"
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive("/dashboard")
                 ? "bg-blue-600 !text-white shadow-md"
                 : "!text-gray-600 hover:bg-blue-100 hover:!text-blue-800"
               }`}
