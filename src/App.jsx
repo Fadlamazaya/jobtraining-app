@@ -13,11 +13,17 @@ import WaterTreatment from "./pages/WaterTreatment";
 import Environment from "./pages/Environment";
 import RawMaterial from "./pages/RawMaterial";
 import Maintenance from "./pages/Maintenance";
+import UserLayout from "./components/HalamanUser/UserLayout";
+import LoginPage from "./pages/HalamanAdmintr/LoginPage";
+import HomePage from "./pages/HalamanAdmintr/HomePage";
+import RegistrasiPage from "./pages/HalamanAdmintr/RegistrasiPage";
+import ApprovalPage from "./pages/HalamanAdmintr/ApprovalPage";
+
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<MainLayout />}>
+      <Route path="/Dashboard" element={<MainLayout />}>
         {/* default redirect */}
         <Route index element={<Navigate to="/Dashboard" replace />} />
 
@@ -35,6 +41,17 @@ function App() {
         <Route path="Kompetensi/RawMaterialPlant" element={<RawMaterial />} />
         <Route path="Kompetensi/MaintenancePlant" element={<Maintenance />} />
       </Route>
+
+      {/* Halaman login tanpa layout */}
+      <Route path="/" element={<LoginPage />} />
+
+      {/* Semua halaman user dibungkus UserLayout */}
+      <Route element={<UserLayout />}>
+        <Route path="home" element={<HomePage />} />
+        <Route path="registrasi" element={<RegistrasiPage />} />
+        <Route path="approval" element={<ApprovalPage />} />
+      </Route>
+
     </Routes>
   );
 }
