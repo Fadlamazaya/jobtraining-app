@@ -18,6 +18,12 @@ import LoginPage from "./pages/HalamanAdmintr/LoginPage";
 import HomePage from "./pages/HalamanAdmintr/HomePage";
 import RegistrasiPage from "./pages/HalamanAdmintr/RegistrasiPage";
 import ApprovalPage from "./pages/HalamanAdmintr/ApprovalPage";
+import EmployeeStatus from "./pages/HalamanUser/EmployeeStatus";
+import TrainingImplementation from "./pages/HalamanUser/TrainingImplementation";
+import TrainingRoom from "./pages/HalamanUser/TrainingRoom";
+import HomePageHR from "./pages/HalamanUser/HomePageHR";
+import HRLayout from "./components/HalamanHR/HrLayout";
+
 
 
 function App() {
@@ -48,6 +54,14 @@ function App() {
         <Route path="registrasi" element={<RegistrasiPage />} />
         <Route path="approval" element={<ApprovalPage />} />
       </Route>
+
+      {/* Semua halaman user dibungkus HRLayout */}
+      <Route element={<HRLayout />}></Route>
+        <Route path="/homepagehr" element={<HomePageHR />} />
+        <Route path="/employee-status" element={<EmployeeStatus />} />
+        <Route path="/training-implementation" element={<TrainingImplementation />} />
+        <Route path="/training-room" element={<TrainingRoom />} />
+
 
     </Routes>
   );
