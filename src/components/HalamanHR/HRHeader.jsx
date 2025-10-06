@@ -47,8 +47,8 @@ const HRHeader = () => {
               to={item.path}
               className={({ isActive }) =>
                 `relative transition-all duration-300 
-                ${isActive ? "text-blue-400 font-semibold" : "text-white"} 
-                hover:text-blue-400 group`
+                ${isActive ? "text-blue-200 font-semibold" : "!text-white"} 
+                hover:text-blue-200 group`
               }
             >
               {item.label}
