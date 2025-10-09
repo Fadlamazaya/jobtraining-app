@@ -126,6 +126,7 @@ export default function WaterTreatment() {
 
   return (
     <div className="p-6">
+       <div className="bg-white p-6 rounded-xl shadow-md">
       <h2 className="text-2xl font-bold mb-2">Kompetensi</h2>
       <p className="mb-4 font-medium">Unit 2 : Water Treatment Plant</p>
 
@@ -298,6 +299,7 @@ export default function WaterTreatment() {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

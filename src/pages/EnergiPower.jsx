@@ -126,6 +126,8 @@ export default function EnergiPower() {
 
   return (
     <div className="p-6">
+      <div className="bg-white p-6 rounded-xl shadow-md">
+        
       <h2 className="text-2xl font-bold mb-2">Kompetensi</h2>
       <p className="mb-4 font-medium">Unit 1 : Energi Power Plant</p>
 
@@ -226,7 +228,7 @@ export default function EnergiPower() {
                     className="border px-3 py-2 text-center bg-white"
                     rowSpan={3}
                   >
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-raw gap-1">
                       <button
                         onClick={() => handleSendNotification(row.nama)}
                         className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
@@ -298,6 +300,7 @@ export default function EnergiPower() {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );
