@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, User, Lock, Building2, ArrowRight, Shield, Waves } from 'lucide-react';
 
+import { db } from '../../firebaseConfig'; // pastikan path sesuai
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+
 const LoginPage = () => {
   const [formData, setFormData] = useState({
     noSAP: '',
@@ -9,6 +13,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -16,8 +21,7 @@ const LoginPage = () => {
       ...prev,
       [name]: value
     }));
-    
-    // Clear errors when user starts typing
+
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -30,9 +34,9 @@ const LoginPage = () => {
     const newErrors = {};
     
     if (!formData.noSAP.trim()) {
-      newErrors.noSAP = 'No. SAP wajib diisi';
-    } else if (formData.noSAP.length < 6) {
-      newErrors.noSAP = 'No. SAP minimal 6 karakter';
+      newErrors.noSAP = 'NIK wajib diisi';
+    } else if (formData.noSAP.length !== 6) {
+      newErrors.noSAP = 'NIK harus 6 angka';
     }
     
     if (!formData.password.trim()) {
@@ -49,21 +53,31 @@ const LoginPage = () => {
     e.preventDefault();
     
     if (!validateForm()) return;
-    
     setIsLoading(true);
-    
+
     try {
-      // Simulasi login process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulasi success
-      alert(`Login berhasil! Selamat datang, ${formData.noSAP}`);
-      
-      // Reset form
-      setFormData({ noSAP: '', password: '' });
-      
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('nik', '==', formData.noSAP),
+        where('password', '==', formData.password)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const user = querySnapshot.docs[0].data();
+        alert(`Login berhasil! Selamat datang, ${user.name}`);
+
+        // Arahkan ke halaman /home
+        navigate('/home');
+      } else {
+        alert('Login gagal! NIK atau password salah.');
+      }
+
     } catch (error) {
-      alert('Login gagal! Periksa kembali No. SAP dan password Anda.');
+      console.error('Error login:', error);
+      alert('Terjadi kesalahan saat login.');
     } finally {
       setIsLoading(false);
     }
