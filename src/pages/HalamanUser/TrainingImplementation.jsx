@@ -1,140 +1,221 @@
-// src/pages/hr/TrainingImplementation.jsx
+// src/pages/hr/TrainingImplementation.jsx (Perbaikan Final)
 import React, { useState, useEffect } from "react";
-import AttendancePDF from "./AttendancePDF"; // harus ada di folder yang sama
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig'; 
+import AttendancePDF from "./AttendancePDF"; 
 import HRHeader from "../../components/HalamanHR/HRHeader";
+import { Download, CheckCircle, FileText } from 'lucide-react';
 
 const TrainingImplementation = () => {
-  const dummyRequests = [
-    { id: 1, nama: "Andi Saputra" },
-    { id: 2, nama: "Budi Santoso" },
-    { id: 3, nama: "Citra Dewi" },
-    { id: 4, nama: "Dedi Firmansyah" },
-  ];
+    // State untuk menampung request yang menunggu approval
+    const [pendingRequests, setPendingRequests] = useState([]);
+    // State untuk menampung request yang sudah di-approve
+    const [approvedRequests, setApprovedRequests] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-  const [requests, setRequests] = useState(dummyRequests);
-  const [approvedRequests, setApprovedRequests] = useState([]);
+    // Fungsi untuk mengambil data dari Firestore
+    const fetchRequests = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const q = collection(db, 'trainingapp'); // Menggunakan nama koleksi yang benar
+            
+            // Query untuk Pending Requests
+            const pendingQuery = query(q, where('status', '==', 'Pending'));
+            const pendingSnapshot = await getDocs(pendingQuery);
+            const pendingData = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Query untuk Approved Requests
+            const approvedQuery = query(q, where('status', '==', 'Approved'));
+            const approvedSnapshot = await getDocs(approvedQuery);
+            
+            // Perbaikan Pemetaan Data: Mengganti nilai string kosong/null menjadi N/A
+            const approvedData = approvedSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return { 
+                    id: doc.id, 
+                    ...data,
+                    // Pastikan field string penting tidak pernah null/kosong saat diproses
+                    noReg: data.noReg || 'N/A', 
+                    area: data.area || 'N/A',
+                    tanggalMulai: data.tanggalMulai || 'N/A',
+                    tanggalSelesai: data.tanggalSelesai || 'N/A',
+                    jamMulai: data.jamMulai || 'N/A',
+                    jamSelesai: data.jamSelesai || 'N/A',
+                    namaInstruktur: data.namaInstruktur || 'N/A',
+                    participants: data.participants || [],
+                    totalHari: data.totalHari || 0
+                };
+            });
 
-  // 🔹 Load data dari localStorage saat pertama kali render
-  useEffect(() => {
-    const savedApproved = localStorage.getItem("approvedRequests");
-    if (savedApproved) {
-      setApprovedRequests(JSON.parse(savedApproved));
+            setPendingRequests(pendingData);
+            setApprovedRequests(approvedData);
+        } catch (err) {
+            console.error("Error fetching requests: ", err);
+            setError("Gagal memuat data dari database.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRequests();
+    }, []);
+
+    // Fungsi untuk menyetujui request dan mengupdate status di Firestore
+    const handleApprove = async (requestId) => {
+        if (!window.confirm("Apakah Anda yakin ingin menyetujui registrasi ini?")) return;
+
+        try {
+            const docRef = doc(db, 'trainingapp', requestId);
+            await updateDoc(docRef, {
+                status: 'Approved',
+                approvedAt: new Date().toISOString(), 
+            });
+
+            fetchRequests();
+
+        } catch (err) {
+            console.error("Error approving request: ", err);
+            alert("Gagal menyetujui registrasi. Cek koneksi Anda.");
+        }
+    };
+
+    // Fungsi untuk men-download materi
+    const handleDownloadMateri = (materiURL, fileName) => {
+        if (materiURL) {
+            window.open(materiURL, '_blank');
+        } else {
+            alert("URL Materi tidak tersedia atau belum diunggah ke Storage.");
+        }
     }
-  }, []);
 
-  // 🔹 Simpan ke localStorage setiap kali approvedRequests berubah
-  useEffect(() => {
-    localStorage.setItem("approvedRequests", JSON.stringify(approvedRequests));
-  }, [approvedRequests]);
-
-  // Fungsi buat dummy absensi 20 orang
-  const generateDummyAttendance = (trainerName) => {
-    const attendance = [];
-    for (let i = 1; i <= 20; i++) {
-      attendance.push({
-        id: i,
-        nama: `Peserta ${i} - ${trainerName}`,
-        hadir: Math.random() > 0.2 ? "Hadir" : "Tidak Hadir",
-        nilai: Math.floor(Math.random() * 41) + 60,
-      });
-    }
-    return attendance;
-  };
-
-  const handleApprove = (id) => {
-    const found = requests.find((r) => r.id === id);
-    if (!found) return;
-
-    const dummyAttendance = generateDummyAttendance(found.nama);
-
-    setApprovedRequests((prev) => [
-      ...prev,
-      { ...found, managerStatus: "approved", attendance: dummyAttendance },
-    ]);
-
-    setRequests((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 px-6 pt-24 pb-12 flex justify-center">
-         <HRHeader />
-      <div className="w-full max-w-5xl bg-white shadow-lg rounded-2xl p-8">
-        <h2 className="text-xl font-bold text-center text-gray-800 mb-6 border-b pb-3">
-            Training Implementation
-        </h2>
-
-        {/* Pending list */}
-        <div className="mb-10">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">
-            ⏳ Pending Approval
-          </h3>
-          {requests.length === 0 ? (
-            <p className="text-gray-500 italic">Tidak ada request pending.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg shadow-sm">
-              <table className="w-full border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                  <tr>
-                    <th className="px-4 py-3 text-center font-medium">ID</th>
-                    <th className="px-4 py-3 text-center font-medium">Nama</th>
-                    <th className="px-4 py-3 text-center font-medium">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((req) => (
-                    <tr
-                      key={req.id}
-                      className="bg-white hover:bg-blue-50 transition"
-                    >
-                      <td className="border px-4 py-3 text-center">{req.id}</td>
-                      <td className="border px-4 py-3 text-center font-medium text-gray-700">
-                        {req.nama}
-                      </td>
-                      <td className="border px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleApprove(req.id)}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm text-sm transition"
-                        >
-                          ✅ Approve
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Approved list */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">
-            ✅ Approved Participants
-          </h3>
-          {approvedRequests.length === 0 ? (
-            <p className="text-gray-500 italic">
-              Belum ada peserta yang disetujui.
-            </p>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-6">
-              {approvedRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="p-5 border rounded-xl shadow-sm bg-gray-50 hover:shadow-md transition"
-                >
-                  <p className="font-semibold text-gray-800 text-lg mb-3">
-                    {req.nama}
-                  </p>
-                  {/* Tombol download absensi */}
-                  <AttendancePDF approvedRequests={req.attendance} />
+    // ... (sisa JSX render tetap sama) ...
+    
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-blue-600 font-medium flex items-center">
+                    <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mr-3"></div>
+                    Memuat data registrasi...
                 </div>
-              ))}
             </div>
-          )}
+        );
+    }
+
+    if (error) {
+         return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <p className="text-red-600">Terjadi kesalahan: {error}</p>
+            </div>
+        );
+    }
+
+
+    return (
+        <div className="min-h-screen bg-gray-50 px-6 pt-24 pb-12 flex justify-center">
+            <HRHeader />
+            <div className="w-full max-w-5xl bg-white shadow-lg rounded-2xl p-8">
+                <h2 className="text-3xl font-bold text-center text-blue-800 mb-8 border-b pb-4">
+                    Training Implementation Manager Dashboard
+                </h2>
+
+                {/* --- PENDING APPROVAL LIST --- */}
+                <div className="mb-10">
+                    <h3 className="text-xl font-semibold text-orange-600 mb-4 flex items-center">
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Pending Approval ({pendingRequests.length})
+                    </h3>
+                    
+                    {pendingRequests.length === 0 ? (
+                        <p className="text-gray-500 italic p-4 bg-green-50 rounded-lg border border-green-200">
+                            🎉 Tidak ada request registrasi pending. Semua sudah beres!
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl shadow-lg border border-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gradient-to-r from-blue-600 to-blue-500 text-white">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-sm font-medium">No. Registrasi</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium">Judul Training</th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium">Pengaju</th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium">Total Peserta</th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {pendingRequests.map((req) => (
+                                        <tr key={req.id} className="hover:bg-blue-50 transition">
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-blue-700">{req.noReg}</td>
+                                            <td className="px-4 py-4 text-sm text-gray-900">{req.judulTraining}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{req.approvalManager}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{req.participants ? req.participants.length : 0}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                <button
+                                                    onClick={() => handleApprove(req.id)}
+                                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 transition"
+                                                >
+                                                    ✅ Approve
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* --- APPROVED LIST --- */}
+                <div>
+                    <h3 className="text-xl font-semibold text-green-700 mb-4 flex items-center">
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Approved Training Sessions ({approvedRequests.length})
+                    </h3>
+                    
+                    {approvedRequests.length === 0 ? (
+                        <p className="text-gray-500 italic p-4 bg-gray-50 rounded-lg border border-gray-200">
+                             Belum ada training yang disetujui.
+                        </p>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-6">
+                            {approvedRequests.map((req) => (
+                                <div
+                                    key={req.id}
+                                    className="p-6 border rounded-xl shadow-md bg-white border-green-300"
+                                >
+                                    <h4 className="font-bold text-lg text-blue-800 mb-2">{req.judulTraining}</h4>
+                                    {/* Menggunakan data yang sudah 'diamankan' saat fetch */}
+                                    <p className="text-sm text-gray-600 mb-3">🗓️ {req.tanggalMulai} s/d {req.tanggalSelesai} | 🧑‍🏫 Instruktur: {req.namaInstruktur}</p>
+
+                                    <div className="flex flex-wrap gap-3 mt-4">
+                                        
+                                        {/* Tombol Download Absensi */}
+                                        <AttendancePDF 
+                                            participantsData={req.participants} 
+                                            trainingTitle={req.judulTraining}
+                                            registrationData={req} // Mengirim objek data yang sudah 'diamankan'
+                                        />
+                                        
+                                        {/* Tombol Download Materi */}
+                                        <button
+                                            onClick={() => handleDownloadMateri(req.materiURL, req.materiFileName)}
+                                            disabled={!req.materiFileName || !req.materiURL || req.materiURL === 'N/A'}
+                                            className="inline-flex items-center px-4 py-2 border border-blue-500 text-sm font-medium rounded-lg text-blue-600 bg-white hover:bg-blue-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <FileText className="w-4 h-4 mr-2" />
+                                            Download Materi ({req.materiFileName || 'N/A'})
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default TrainingImplementation;

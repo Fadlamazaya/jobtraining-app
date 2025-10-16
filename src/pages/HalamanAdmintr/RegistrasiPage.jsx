@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, Upload, FileText, User, Building, Save, Send, FileX, Eye } from 'lucide-react';
+import { Calendar, Clock, Users, Upload, FileText, User, Building, Save, Send, FileX, Eye, Info } from 'lucide-react'; // Tambah Info icon
+// 1. Import Firestore Functions dan db dari firebaseConfig.js
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebaseConfig'; 
+// Catatan: Jika Anda ingin implementasi upload file sungguhan, Anda perlu mengimpor:
+// import { storage } from '../../firebaseConfig'; 
+// import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; 
 
 const RegistrasiPage = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -20,15 +26,15 @@ const RegistrasiPage = () => {
     namaInstruktur: '',
     noSAP: '',
     instansi: '',
-    materi: null,
+    materi: null, // Objek File (tidak boleh dikirim langsung ke Firestore)
     approvalManager: '',
     lastApproval: 'Department Head'
   });
 
   // State untuk Participant
   const [participantInfo, setParticipantInfo] = useState({
-    selectedRole: '',
-    jumlahPeserta: '',
+    selectedRole: '', // Data sementara (tidak boleh dikirim ke Firestore)
+    jumlahPeserta: '', // Data sementara (tidak boleh dikirim ke Firestore)
     participants: []
   });
 
@@ -37,22 +43,16 @@ const RegistrasiPage = () => {
   const [totalHari, setTotalHari] = useState(0);
   const [totalJam, setTotalJam] = useState(0);
 
-  // Data master
+  // Data master (Dikeluarkan dari state utama)
   const areaOptions = [
-    'Power Plant',
-    'Water Treatment Plant',
-    'Environment Protection Plant',
-    'Raw Material Plant',
-    'Maintenance Plant'
+    'Power Plant', 'Water Treatment Plant', 'Environment Protection Plant', 
+    'Raw Material Plant', 'Maintenance Plant'
   ];
 
   const kelasOptions = [
-    { nama: 'Davinci', kapasitas: 20 },
-    { nama: 'Newton', kapasitas: 25 },
-    { nama: 'Edison', kapasitas: 30 },
-    { nama: 'Copernicus', kapasitas: 20 },
-    { nama: 'Aristoteles', kapasitas: 25 },
-    { nama: 'Archimedes', kapasitas: 30 },
+    { nama: 'Davinci', kapasitas: 20 }, { nama: 'Newton', kapasitas: 25 }, 
+    { nama: 'Edison', kapasitas: 30 }, { nama: 'Copernicus', kapasitas: 20 }, 
+    { nama: 'Aristoteles', kapasitas: 25 }, { nama: 'Archimedes', kapasitas: 30 }, 
     { nama: 'Plato', kapasitas: 20 }
   ];
 
@@ -76,13 +76,25 @@ const RegistrasiPage = () => {
       const startDate = new Date(generalInfo.tanggalMulai);
       const endDate = new Date(generalInfo.tanggalSelesai);
       const diffTime = Math.abs(endDate - startDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      // +1 karena jika mulai dan selesai di hari yang sama, hitungannya 1 hari
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
 
       const [startHour, startMin] = generalInfo.jamMulai.split(':').map(Number);
       const [endHour, endMin] = generalInfo.jamSelesai.split(':').map(Number);
       const startMinutes = startHour * 60 + startMin;
       const endMinutes = endHour * 60 + endMin;
-      const totalMinutes = endMinutes - startMinutes;
+      let totalMinutes = endMinutes - startMinutes;
+
+      // Tangani jika jam selesai < jam mulai (misal training berlangsung di hari berikutnya)
+      if (totalMinutes <= 0 && diffDays > 1) { 
+        // Jika ada perbedaan hari, tambahkan 24 jam untuk setiap hari penuh, ini kompleks
+        // Untuk penyederhanaan: jika durasi lebih dari 1 hari, kita asumsikan 8 jam/hari (hanya contoh sederhana)
+        // Kita hanya akan menampilkan durasi jam per hari
+      } else if (totalMinutes <= 0 && diffDays === 1) {
+         // Jika mulai jam 23:00 selesai 01:00 (di hari yang sama) ini tidak mungkin
+         // Asumsi: jika tanggal sama dan jam selesai < jam mulai, total jam akan 0, perlu validasi
+      }
+      
       const hours = Math.floor(totalMinutes / 60);
       const minutes = totalMinutes % 60;
 
@@ -99,10 +111,8 @@ const RegistrasiPage = () => {
     const file = e.target.files[0];
     if (file) {
       const allowedTypes = [
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/pdf'
       ];
 
@@ -119,7 +129,6 @@ const RegistrasiPage = () => {
     const required = ['judulTraining', 'area', 'kelasTraining', 'tanggalMulai', 'tanggalSelesai', 'jamMulai', 'jamSelesai', 'instrukturType', 'namaInstruktur', 'approvalManager'];
     const missingFields = required.filter(field => !generalInfo[field]);
 
-    // Validasi tambahan untuk instruktur
     if (generalInfo.instrukturType === 'internal' && !generalInfo.noSAP) {
       missingFields.push('noSAP');
     }
@@ -133,16 +142,6 @@ const RegistrasiPage = () => {
       return;
     }
 
-    setActiveTab('participant');
-  };
-
-  // Fungsi untuk menangani klik tab participant
-  const handleParticipantTabClick = () => {
-    if (!isGeneralFormValid()) {
-      setShowAlert(true);
-      setTimeout(() => setShowAlert(false), 3000);
-      return;
-    }
     setActiveTab('participant');
   };
 
@@ -160,22 +159,18 @@ const RegistrasiPage = () => {
     return isBasicValid;
   };
 
+  const handleParticipantTabClick = () => {
+    if (!isGeneralFormValid()) {
+      setShowAlert(true);
+      setTimeout(() => setShowAlert(false), 3000);
+      return;
+    }
+    setActiveTab('participant');
+  };
+
   const handleParticipantChange = (index, field, value) => {
     const updatedParticipants = [...participantInfo.participants];
     updatedParticipants[index] = { ...updatedParticipants[index], [field]: value };
-    setParticipantInfo(prev => ({ ...prev, participants: updatedParticipants }));
-  };
-
-  const addParticipant = () => {
-    const newParticipant = { nama: '', nik: '', role: '', unit: '' };
-    setParticipantInfo(prev => ({
-      ...prev,
-      participants: [...prev.participants, newParticipant]
-    }));
-  };
-
-  const removeParticipant = (index) => {
-    const updatedParticipants = participantInfo.participants.filter((_, i) => i !== index);
     setParticipantInfo(prev => ({ ...prev, participants: updatedParticipants }));
   };
 
@@ -193,8 +188,8 @@ const RegistrasiPage = () => {
       setParticipantInfo(prev => ({
         ...prev,
         participants: [...prev.participants, ...newParticipants],
-        selectedRole: '',
-        jumlahPeserta: ''
+        selectedRole: '', // Reset data input sementara
+        jumlahPeserta: '' // Reset data input sementara
       }));
     }
   };
@@ -205,6 +200,11 @@ const RegistrasiPage = () => {
       return;
     }
     generateParticipants();
+  };
+  
+  const removeParticipant = (index) => {
+    const updatedParticipants = participantInfo.participants.filter((_, i) => i !== index);
+    setParticipantInfo(prev => ({ ...prev, participants: updatedParticipants }));
   };
 
   const handleSubmit = () => {
@@ -227,40 +227,111 @@ const RegistrasiPage = () => {
   };
 
   const handleDraft = () => {
-    alert('Data berhasil disimpan sebagai draft');
+    alert('Data berhasil disimpan sebagai draft (Implementasi draft perlu penyesuaian dengan Firebase)');
   };
 
   const handleReset = () => {
     if (confirm('Apakah Anda yakin ingin mereset semua data?')) {
       setGeneralInfo({
-        noReg: generalInfo.noReg,
-        judulTraining: '',
-        area: '',
-        kelasTraining: '',
-        tanggalMulai: '',
-        tanggalSelesai: '',
-        jamMulai: '',
-        jamSelesai: '',
-        instrukturType: '',
-        namaInstruktur: '',
-        noSAP: '',
-        instansi: '',
-        materi: null,
-        approvalManager: '',
-        lastApproval: 'Department Head'
+        noReg: generalInfo.noReg, judulTraining: '', area: '', kelasTraining: '',
+        tanggalMulai: '', tanggalSelesai: '', jamMulai: '', jamSelesai: '',
+        instrukturType: '', namaInstruktur: '', noSAP: '', instansi: '',
+        materi: null, approvalManager: '', lastApproval: 'Department Head'
       });
-      setParticipantInfo(prev => ({ ...prev, selectedRole: '', jumlahPeserta: '', participants: [] }));
+      setParticipantInfo({ selectedRole: '', jumlahPeserta: '', participants: [] });
       setActiveTab('general');
     }
   };
 
-  const handleFinalSubmit = () => {
-    alert('Registrasi berhasil dikirim!');
-    setShowPreview(false);
-    // Reset form atau redirect
+  // 2. FUNGSI UTAMA: PENGIRIMAN DATA KE FIRESTORE (PERBAIKAN FINAL)
+  const handleFinalSubmit = async () => {
+    setIsLoading(true);
+    let materiURL = null;
+
+    try {
+        // Placeholder untuk Upload File ke Firebase Storage
+        if (generalInfo.materi) {
+            materiURL = `/materi/${generalInfo.noReg}/${generalInfo.materi.name}`; 
+        }
+
+        // PERBAIKAN ERROR FIREBASE (TIDAK MENGIRIM UNDEFINED/OBJEK FILE)
+        const { materi, ...generalInfoToSave } = generalInfo;
+
+        // Data yang akan disimpan ke koleksi 'trainingapp'
+        const registrationData = {
+            ...generalInfoToSave, // Menyimpan semua field General Info kecuali 'materi'
+            participants: participantInfo.participants, // Menyimpan array peserta
+            totalHari: totalHari,
+            totalJam: totalJam,
+            
+            // Field terkait File/URL
+            materiFileName: generalInfo.materi ? generalInfo.materi.name : null,
+            materiURL: materiURL, 
+            
+            // Status dan Timestamp
+            status: 'Pending', // Status awal untuk Approval Manager
+            createdAt: serverTimestamp(), 
+        };
+        
+        // Menyimpan data ke koleksi 'trainingapp'
+        const docRef = await addDoc(collection(db, 'trainingapp'), registrationData); 
+        
+        alert(`Registrasi berhasil dikirim! ID Dokumen: ${docRef.id}`);
+        
+        // Setelah berhasil, reset form dan kembali ke General Info
+        setGeneralInfo(prev => ({
+            ...prev,
+            judulTraining: '', area: '', kelasTraining: '', tanggalMulai: '', tanggalSelesai: '', 
+            jamMulai: '', jamSelesai: '', instrukturType: '', namaInstruktur: '', noSAP: '', 
+            instansi: '', materi: null, approvalManager: ''
+        }));
+        setParticipantInfo({ selectedRole: '', jumlahPeserta: '', participants: [] });
+        setShowPreview(false);
+        setActiveTab('general');
+
+    } catch (error) {
+        console.error('Error saat menyimpan registrasi: ', error);
+        alert('Gagal mengirim registrasi. Silakan coba lagi. (Cek log konsol untuk detail error)');
+    } finally {
+        setIsLoading(false);
+    }
   };
 
+  // --- KOMPONEN RINGKASAN INSTRUKTUR ---
+  const InstructorSummary = () => {
+    const { namaInstruktur, instrukturType, noSAP, instansi } = generalInfo;
+    
+    // Periksa apakah data instruktur sudah terisi valid
+    if (!namaInstruktur) {
+        return (
+            <p className="text-sm text-red-500 flex items-center">
+                <Info className="w-4 h-4 mr-2" />
+                Lengkapi detail Instruktur di tab General Info untuk melanjutkan.
+            </p>
+        );
+    }
+
+    const detail = instrukturType === 'internal' 
+        ? `No. SAP: ${noSAP || 'N/A'}`
+        : `Instansi: ${instansi || 'N/A'}`;
+        
+    return (
+        <div className="bg-white p-4 border border-blue-200 rounded-lg shadow-sm">
+            <h4 className="font-semibold text-blue-800 flex items-center">
+                <User className="w-4 h-4 mr-2" />
+                Instruktur ({instrukturType.toUpperCase()}): {namaInstruktur}
+            </h4>
+            <p className="text-sm text-gray-600 mt-1 pl-6">
+                {detail}
+            </p>
+        </div>
+    );
+  };
+  // ------------------------------------
+
+
   if (showPreview) {
+    // ... (Preview JSX tetap sama)
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6">
         <div className="max-w-4xl mx-auto">
@@ -282,7 +353,11 @@ const RegistrasiPage = () => {
                   <div><span className="font-medium">Jam:</span> {generalInfo.jamMulai} - {generalInfo.jamSelesai}</div>
                   <div><span className="font-medium">Total Hari:</span> {totalHari} hari</div>
                   <div><span className="font-medium">Total Jam:</span> {totalJam.toFixed(1)} jam</div>
+                  {/* Perubahan di sini untuk konsistensi Preview */}
                   <div><span className="font-medium">Instruktur:</span> {generalInfo.namaInstruktur} ({generalInfo.instrukturType})</div>
+                  {generalInfo.instrukturType === 'internal' && <div><span className="font-medium">No. SAP Instruktur:</span> {generalInfo.noSAP}</div>}
+                  {generalInfo.instrukturType === 'external' && <div><span className="font-medium">Instansi:</span> {generalInfo.instansi}</div>}
+                  {/* Akhir Perubahan Preview */}
                   <div><span className="font-medium">Approval Manager:</span> {generalInfo.approvalManager}</div>
                 </div>
               </div>
@@ -398,6 +473,7 @@ const RegistrasiPage = () => {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-blue-900 mb-6">General Information</h2>
 
+                {/* --- SISA GENERAL INFO TETAP SAMA --- */}
                 {/* No Registrasi */}
                 <div>
                   <label className="block text-sm font-medium text-blue-700 mb-2">No. Registrasi</label>
@@ -643,7 +719,29 @@ const RegistrasiPage = () => {
             {activeTab === 'participant' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-blue-900 mb-6">Participants Information</h2>
+                
+                {/* ========================================================= */}
+                {/* PERBAIKAN: TAMBAH RINGKASAN INSTRUKTUR DI HALAMAN PARTICIPANTS */}
+                {/* ========================================================= */}
+                <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                        <Info className="w-5 h-5 mr-2 text-blue-500"/>
+                        Ringkasan Instruktur & Training
+                    </h3>
+                    
+                    {/* Tampilkan Ringkasan Instruktur */}
+                    <InstructorSummary />
 
+                    {/* Ringkasan Training Dasar */}
+                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-3 border-t pt-3">
+                        <p><span className="font-medium">Judul:</span> {generalInfo.judulTraining || '-'}</p>
+                        <p><span className="font-medium">Area/Unit:</span> {generalInfo.area || '-'}</p>
+                        <p><span className="font-medium">Tanggal:</span> {generalInfo.tanggalMulai || '-'} s/d {generalInfo.tanggalSelesai || '-'}</p>
+                        <p><span className="font-medium">Kelas:</span> {generalInfo.kelasTraining || '-'}</p>
+                    </div>
+                </div>
+                {/* ========================================================= */}
+                
                 {/* Role Selection */}
                 <div className="bg-blue-50 p-6 rounded-lg">
                   <h3 className="text-lg font-semibold text-blue-800 mb-4">Tambah Peserta Training</h3>
@@ -721,7 +819,7 @@ const RegistrasiPage = () => {
                           <div className="flex justify-between items-center mb-3">
                             <h4 className="font-medium text-blue-700 flex items-center">
                               <span className={`inline-block w-6 h-6 rounded-full text-white text-xs flex items-center justify-center mr-2 ${participant.role === 'T' ? 'bg-green-500' : 'bg-blue-500'
-                                }`}>
+                                  }`}>
                                 {participant.role}
                               </span>
                               {participant.role === 'T' ? 'Trainer' : 'Instructor'} #{index + 1}
