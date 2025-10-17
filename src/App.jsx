@@ -24,6 +24,7 @@ import TrainingRoom from "./pages/HalamanUser/TrainingRoom";
 import HomePageHR from "./pages/HalamanUser/HomePageHR";
 import HRLayout from "./components/HalamanHR/HrLayout";
 import TrainingRecords from "./pages/HalamanUser/trainingRecords";
+import FormEvaluation from "./pages/HalamanUser/FormEvaluation";
 
 
 
@@ -63,6 +64,7 @@ function App() {
         <Route path="/training-implementation" element={<TrainingImplementation />} />
         <Route path="/training-room" element={<TrainingRoom />} />
         <Route path="/training-records" element={<TrainingRecords />} />
+        <Route path="/attendance" element={<FormEvaluation />} />
 
 
     </Routes>
