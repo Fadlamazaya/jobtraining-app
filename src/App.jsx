@@ -23,6 +23,7 @@ import TrainingImplementation from "./pages/HalamanUser/TrainingImplementation";
 import TrainingRoom from "./pages/HalamanUser/TrainingRoom";
 import HomePageHR from "./pages/HalamanUser/HomePageHR";
 import HRLayout from "./components/HalamanHR/HrLayout";
+import TrainingRecords from "./pages/HalamanUser/trainingRecords";
 
 
 
@@ -61,6 +62,7 @@ function App() {
         <Route path="/employee-status" element={<EmployeeStatus />} />
         <Route path="/training-implementation" element={<TrainingImplementation />} />
         <Route path="/training-room" element={<TrainingRoom />} />
+        <Route path="/training-records" element={<TrainingRecords />} />
 
 
     </Routes>
