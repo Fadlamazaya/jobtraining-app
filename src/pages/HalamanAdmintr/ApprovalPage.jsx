@@ -1,398 +1,535 @@
-import React, { useState } from 'react';
-import { 
-  FileText, Download, Upload, Check, X, Clock, User, Calendar, 
-  Building, BookOpen, MessageSquare, Eye, ChevronDown, ChevronUp,
-  CheckCircle, XCircle, AlertCircle, Paperclip
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Check, X, Eye, FileText, Clock, CheckCircle, XCircle, Filter, Download } from 'lucide-react';
+import { collection, query, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore'; // 💡 Import untuk operasi DB
+import { db } from '../../firebaseConfig'; // 💡 Import db
+
+// Konstanta untuk nama koleksi
+const TRAINING_COLLECTION = 'trainingapp';
+const MANAGER_APPROVAL_COLLECTION = 'approvalManager';
 
 export default function ApprovalPage() {
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [approvalStatus, setApprovalStatus] = useState('');
-  const [comments, setComments] = useState('');
-  const [attachedFiles, setAttachedFiles] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [expandedRequest, setExpandedRequest] = useState(null);
+    const [approvals, setApprovals] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [selectedApproval, setSelectedApproval] = useState(null);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showActionModal, setShowActionModal] = useState(false);
+    const [actionType, setActionType] = useState('');
+    const [reviewNote, setReviewNote] = useState('');
 
-  // Sample data registrasi yang perlu approval
-  const [registrationRequests, setRegistrationRequests] = useState([
-    {
-      id: 1,
-      nama: "Ahmad Ridwan",
-      tanggal: "2025-09-15",
-      jamMulai: "09:00",
-      jamSelesai: "17:00",
-      unit: "IT Department",
-      kelas: "Technical Training",
-      judul: "Advanced React Development and Best Practices",
-      submitDate: "2025-08-28",
-      status: "pending",
-      requestedBy: "ahmad.ridwan@company.com",
-      attachments: ["CV_Ahmad_Ridwan.pdf", "Certificate_React.pdf"]
-    },
-    {
-      id: 2,
-      nama: "Siti Nurhaliza",
-      tanggal: "2025-09-20",
-      jamMulai: "13:00",
-      jamSelesai: "16:00",
-      unit: "Human Resources",
-      kelas: "Leadership Training",
-      judul: "Team Leadership and Management Skills",
-      submitDate: "2025-08-27",
-      status: "pending",
-      requestedBy: "siti.nurhaliza@company.com",
-      attachments: ["Portfolio_Leadership.pdf"]
-    },
-    {
-      id: 3,
-      nama: "Budi Santoso",
-      tanggal: "2025-09-18",
-      jamMulai: "08:00",
-      jamSelesai: "12:00",
-      unit: "Finance",
-      kelas: "Basic Training",
-      judul: "Financial Analysis and Reporting",
-      submitDate: "2025-08-26",
-      status: "approved",
-      requestedBy: "budi.santoso@company.com",
-      attachments: ["Finance_Background.pdf"],
-      approvedDate: "2025-08-28",
-      approvedBy: "supervisor@company.com"
-    }
-  ]);
+    const statusConfig = {
+        pending: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
+        approved: { label: 'Disetujui', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+        rejected: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: XCircle }
+    };
 
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setAttachedFiles(prev => [...prev, ...files.map(file => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file: file
-    }))]);
-  };
+    // 💡 FUNGSI FETCH DATA DARI FIRESTORE
+    const fetchApprovals = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            // Ambil SEMUA data dari koleksi trainingapp
+            const q = query(collection(db, TRAINING_COLLECTION));
+            const snapshot = await getDocs(q);
+            
+            const data = snapshot.docs.map(doc => {
+                const docData = doc.data();
+                const submittedDate = docData.createdAt?.toDate()?.toLocaleDateString('id-ID') || 'N/A';
+                
+                // Menyesuaikan struktur data untuk tampilan Manager
+                return {
+                    id: doc.id,
+                    noReg: doc.id, // Menggunakan Document ID sebagai NoReg
+                    judulTraining: docData.judulTraining,
+                    area: docData.area,
+                    kelasTraining: docData.kelasTraining,
+                    tanggalMulai: docData.tanggalMulai,
+                    tanggalSelesai: docData.tanggalSelesai,
+                    jamMulai: docData.jamMulai,
+                    jamSelesai: docData.jamSelesai,
+                    instrukturType: docData.instrukturType,
+                    
+                    // Data yang dibutuhkan untuk detail dan aksi
+                    namaInstruktur: docData.namaInstruktur,
+                    instansi: docData.instrukturNikOrInstansi, // Menggunakan field gabungan NIK/Instansi
+                    materiURL: docData.materiURL, // 💡 URL untuk Download
+                    materiFileName: docData.materiFileName,
+                    status: docData.status || 'pending',
+                    submittedDate: submittedDate,
+                    submittedBy: docData.submittedBy,
+                    approvalDate: docData.approvalDate || '',
+                    reviewNote: docData.reviewNote || '',
+                };
+            });
+            setApprovals(data);
+        } catch (error) {
+            console.error("Error fetching approvals:", error);
+            alert("Gagal memuat data dari Firestore.");
+            setApprovals([]); 
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-  const removeFile = (index) => {
-    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleApproval = (requestId, status) => {
-    setIsProcessing(true);
+    useEffect(() => {
+        fetchApprovals();
+    }, [fetchApprovals]);
     
-    setTimeout(() => {
-      setRegistrationRequests(prev => 
-        prev.map(req => 
-          req.id === requestId 
-            ? { 
-                ...req, 
-                status: status,
-                approvedDate: new Date().toISOString().split('T')[0],
-                approvedBy: "supervisor@company.com",
-                approvalComments: comments,
-                approvalAttachments: attachedFiles
-              }
-            : req
-        )
-      );
-      
-      setIsProcessing(false);
-      setSelectedRequest(null);
-      setComments('');
-      setAttachedFiles([]);
-      setApprovalStatus('');
-      
-      alert(`Registrasi ${status === 'approved' ? 'disetujui' : 'ditolak'} berhasil!`);
-    }, 2000);
-  };
+    // 💡 LOGIKA HANDLE APPROVE/REJECT KE FIRESTORE
+    const updateApprovalStatus = async (noReg, newStatus, note) => {
+        const docRef = doc(db, TRAINING_COLLECTION, noReg);
+        const approvalDate = new Date().toISOString().split('T')[0];
+        const selectedData = approvals.find(a => a.noReg === noReg);
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'approved': return 'text-green-400 bg-green-400/10 border-green-400/20';
-      case 'rejected': return 'text-red-400 bg-red-400/10 border-red-400/20';
-      default: return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
+        try {
+            // LANGKAH 1: Update status di koleksi utama (trainingapp)
+            await updateDoc(docRef, {
+                status: newStatus,
+                reviewNote: note,
+                approvalDate: approvalDate,
+                approvalManager: selectedData.approvalManager, // Memastikan nama manager tetap ada
+                // Tidak perlu update submittedBy
+            });
+
+            // LANGKAH 2: Simpan/Salin ke koleksi approvalManager jika disetujui
+            if (newStatus === 'approved') {
+                const approvedDocRef = doc(db, MANAGER_APPROVAL_COLLECTION, noReg);
+                
+                // Pastikan hanya menyalin data yang relevan setelah status diupdate
+                await setDoc(approvedDocRef, { 
+                    ...selectedData, 
+                    status: newStatus, 
+                    reviewNote: note, 
+                    approvalDate: approvalDate,
+                    approvedBy: selectedData.approvalManager // Manager yang meng-approve
+                });
+            }
+            
+            // Perbarui state lokal setelah sukses
+            fetchApprovals(); // Refresh data dari DB
+            alert(`Registrasi ${noReg} berhasil di${newStatus === 'approved' ? 'setujui' : 'tolak'}!`);
+
+        } catch (error) {
+            console.error(`Error updating status for ${noReg}:`, error);
+            alert(`Gagal memperbarui status registrasi ${noReg}.`);
+        }
+    };
+    
+    const handleSubmitAction = () => {
+        if (actionType === 'rejected' && !reviewNote.trim()) {
+            alert("Catatan Review harus diisi untuk penolakan.");
+            return;
+        }
+
+        // Memanggil fungsi update ke Firestore
+        updateApprovalStatus(selectedApproval.noReg, actionType, reviewNote);
+
+        setShowActionModal(false);
+        setSelectedApproval(null);
+        setReviewNote('');
+    };
+    
+    const handleAction = (approval, type) => {
+        setSelectedApproval(approval);
+        setActionType(type);
+        setReviewNote('');
+        setShowActionModal(true);
+    };
+
+    const handleViewDetail = (approval) => {
+        setSelectedApproval(approval);
+        setShowDetailModal(true);
+    };
+
+    const getStatusCount = (status) => {
+        return approvals.filter(a => a.status === status).length;
+    };
+
+
+    const filteredApprovals = approvals.filter(approval => {
+        const matchesSearch = 
+            approval.noReg.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            approval.judulTraining.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            approval.area.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesFilter = filterStatus === 'all' || approval.status === filterStatus;
+        
+        // 💡 Hanya tampilkan data yang perlu di-review manager (status 'pending') atau yang sudah di review
+        return matchesSearch && matchesFilter;
+    });
+
+    if (isLoading) {
+        return (
+            <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
+                <div className="text-blue-600 flex items-center">
+                    <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mr-3"></div>
+                    Memuat data persetujuan...
+                </div>
+            </div>
+        );
     }
-  };
 
-  const getStatusIcon = (status) => {
-    switch(status) {
-      case 'approved': return <CheckCircle className="w-4 h-4" />;
-      case 'rejected': return <XCircle className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
-    }
-  };
+    return (
+        <div className="w-screen h-screen bg-gradient-to-br from-gray-50 to-blue-50 overflow-auto">
+            <div className="w-full h-full px-8 py-6">
+                
+                {/* Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Approval Training</h1>
+                    <p className="text-gray-600">Kelola persetujuan registrasi training dari tim Anda</p>
+                </div>
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-4">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-      </div>
-
-      <div className="relative max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Training Approval Center</h1>
-          <p className="text-blue-100">Kelola persetujuan registrasi training karyawan</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Request List */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Daftar Registrasi Training
-              </h2>
-              
-              <div className="space-y-3">
-                {registrationRequests.map((request) => (
-                  <div key={request.id} className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all duration-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-white" />
-                        </div>
+                {/* --- Stats Cards --- */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="text-white font-medium">{request.nama}</h3>
-                          <p className="text-blue-200 text-sm">{request.requestedBy}</p>
+                          <p className="text-gray-600 text-sm">Total Ajuan</p>
+                          <p className="text-2xl font-bold text-gray-800">{approvals.length}</p>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center space-x-1 ${getStatusColor(request.status)}`}>
-                          {getStatusIcon(request.status)}
-                          <span>{request.status === 'approved' ? 'Disetujui' : request.status === 'rejected' ? 'Ditolak' : 'Menunggu'}</span>
-                        </span>
-                        <button
-                          onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
-                          className="text-blue-300 hover:text-white p-1 rounded"
-                        >
-                          {expandedRequest === request.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
+                        <FileText className="w-8 h-8 text-blue-500" />
                       </div>
                     </div>
+                    
+                    <div className="bg-white rounded-lg shadow p-5 border-l-4 border-yellow-500">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-gray-600 text-sm">Menunggu</p>
+                          <p className="text-2xl font-bold text-gray-800">{getStatusCount('pending')}</p>
+                        </div>
+                        <Clock className="w-8 h-8 text-yellow-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg shadow p-5 border-l-4 border-green-500">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-gray-600 text-sm">Disetujui</p>
+                          <p className="text-2xl font-bold text-gray-800">{getStatusCount('approved')}</p>
+                        </div>
+                        <CheckCircle className="w-8 h-8 text-green-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg shadow p-5 border-l-4 border-red-500">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-gray-600 text-sm">Ditolak</p>
+                          <p className="text-2xl font-bold text-gray-800">{getStatusCount('rejected')}</p>
+                        </div>
+                        <XCircle className="w-8 h-8 text-red-500" />
+                      </div>
+                    </div>
+                </div>
 
-                    {expandedRequest === request.id && (
-                      <div className="space-y-3 border-t border-white/10 pt-3 mt-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                          <div className="flex items-center text-blue-200">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            <span>Tanggal: {request.tanggal}</span>
-                          </div>
-                          <div className="flex items-center text-blue-200">
-                            <Clock className="w-4 h-4 mr-2" />
-                            <span>Waktu: {request.jamMulai} - {request.jamSelesai}</span>
-                          </div>
-                          <div className="flex items-center text-blue-200">
-                            <Building className="w-4 h-4 mr-2" />
-                            <span>Unit: {request.unit}</span>
-                          </div>
-                          <div className="flex items-center text-blue-200">
-                            <BookOpen className="w-4 h-4 mr-2" />
-                            <span>Kelas: {request.kelas}</span>
-                          </div>
+                {/* --- Search and Filter --- */}
+                <div className="bg-white rounded-lg shadow p-5 mb-6">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                                type="text"
+                                placeholder="Cari berdasarkan No. Registrasi, Judul, atau Area..."
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
                         </div>
                         
-                        <div className="text-blue-200">
-                          <p className="font-medium mb-1">Judul Materi:</p>
-                          <p className="text-sm bg-white/5 rounded-lg p-2">{request.judul}</p>
+                        <div className="flex items-center gap-2">
+                            <Filter className="text-gray-400 w-5 h-5" />
+                            <select
+                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                            >
+                                <option value="all">Semua Status</option>
+                                <option value="pending">Menunggu</option>
+                                <option value="approved">Disetujui</option>
+                                <option value="rejected">Ditolak</option>
+                            </select>
                         </div>
+                    </div>
+                </div>
 
-                        {request.attachments && request.attachments.length > 0 && (
-                          <div className="text-blue-200">
-                            <p className="font-medium mb-2">File Lampiran:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {request.attachments.map((file, index) => (
-                                <div key={index} className="flex items-center bg-white/5 rounded-lg px-3 py-1 text-xs">
-                                  <Paperclip className="w-3 h-3 mr-1" />
-                                  <span>{file}</span>
-                                  <button className="ml-2 text-blue-400 hover:text-blue-300">
-                                    <Download className="w-3 h-3" />
-                                  </button>
+                {/* --- Approvals List --- */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-blue-600 text-white">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">No. Registrasi</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Judul Training</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Area</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Tanggal</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Status</th>
+                                    <th className="px-6 py-3 text-center text-sm font-semibold">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {filteredApprovals.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                            Tidak ada data yang ditemukan
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredApprovals.map((approval) => {
+                                        const StatusIcon = statusConfig[approval.status]?.icon || Clock;
+                                        return (
+                                            <tr key={approval.noReg} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <span className="font-medium text-gray-900">{approval.noReg}</span>
+                                                    <p className="text-xs text-gray-500 mt-1">Diajukan: {approval.submittedDate}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-gray-900">{approval.judulTraining}</span>
+                                                    <p className="text-xs text-gray-500 mt-1">{approval.kelasTraining}</p>
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-900">{approval.area}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-gray-900 text-sm">{approval.tanggalMulai}</span>
+                                                    <p className="text-xs text-gray-500">s/d {approval.tanggalSelesai}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${statusConfig[approval.status]?.color}`}>
+                                                        <StatusIcon className="w-3 h-3" />
+                                                        {statusConfig[approval.status]?.label}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleViewDetail(approval)}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="Lihat Detail"
+                                                        >
+                                                            <Eye className="w-5 h-5" />
+                                                        </button>
+                                                        
+                                                        {/* 💡 TOMBOL DOWNLOAD MATERI */}
+                                                        {approval.materiURL && (
+                                                            <a
+                                                                href={approval.materiURL}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                                title={`Unduh Materi: ${approval.materiFileName || 'File'}`}
+                                                            >
+                                                                <Download className="w-5 h-5" />
+                                                            </a>
+                                                        )}
+                                                        
+                                                        {approval.status === 'pending' && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleAction(approval, 'approved')}
+                                                                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                    title="Setujui"
+                                                                >
+                                                                    <Check className="w-5 h-5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleAction(approval, 'rejected')}
+                                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Tolak"
+                                                                >
+                                                                    <X className="w-5 h-5" />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* --- Detail Modal --- */}
+                {showDetailModal && selectedApproval && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between">
+                                <h2 className="text-xl font-bold">Detail Training</h2>
+                                <button
+                                    onClick={() => setShowDetailModal(false)}
+                                    className="text-white hover:bg-blue-700 rounded-lg p-1"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">No. Registrasi</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.noReg}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Judul Training</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.judulTraining}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Area</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.area}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Kelas Training</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.kelasTraining}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Tanggal Mulai</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.tanggalMulai}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Tanggal Selesai</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.tanggalSelesai}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Jam</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.jamMulai} - {selectedApproval.jamSelesai}</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Diajukan Oleh</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.submittedBy}</p>
+                                    </div>
+                                    
+                                    {/* Instruktur Details */}
+                                    <div className="md:col-span-2 border-t pt-4 mt-2">
+                                        <h3 className="font-bold text-md text-blue-700 mb-2">Detail Instruktur</h3>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Tipe Instruktur</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.instrukturType}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">Nama Instruktur</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.namaInstruktur}</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-semibold text-gray-600">NIK / Instansi</label>
+                                        <p className="text-gray-900 mt-1">{selectedApproval.instansi}</p>
+                                    </div>
+
+                                    {/* Materi File */}
+                                    <div className="md:col-span-2">
+                                        <label className="text-sm font-semibold text-gray-600">Materi Training</label>
+                                        <div className="mt-1">
+                                            {selectedApproval.materiURL ? (
+                                                <a 
+                                                    href={selectedApproval.materiURL} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"
+                                                >
+                                                    <Download className="w-4 h-4 mr-1"/> Unduh File ({selectedApproval.materiFileName || 'File Materi'})
+                                                </a>
+                                            ) : (
+                                                <p className="text-gray-500">Tidak ada file materi dilampirkan.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Status & Review Note */}
+                                    <div className="md:col-span-2 border-t pt-4 mt-2">
+                                        <label className="text-sm font-semibold text-gray-600">Status</label>
+                                        <div className="mt-1">
+                                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${statusConfig[selectedApproval.status].color}`}>
+                                                {statusConfig[selectedApproval.status].label} {selectedApproval.approvalDate && `(${selectedApproval.approvalDate})`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    {selectedApproval.reviewNote && (
+                                        <div className="md:col-span-2">
+                                            <label className="text-sm font-semibold text-gray-600">Catatan Review</label>
+                                            <p className="text-gray-900 mt-1 bg-gray-50 p-3 rounded-lg">{selectedApproval.reviewNote}</p>
+                                        </div>
+                                    )}
                                 </div>
-                              ))}
                             </div>
-                          </div>
-                        )}
-
-                        {request.status === 'pending' && (
-                          <div className="flex space-x-2 pt-2">
-                            <button
-                              onClick={() => setSelectedRequest(request)}
-                              className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center space-x-1"
-                            >
-                              <Eye className="w-4 h-4" />
-                              <span>Review & Approve</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Approval Panel */}
-          <div className="space-y-4">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Panel Approval</h2>
-              
-              {selectedRequest ? (
-                <div className="space-y-4">
-                  <div className="bg-white/5 rounded-xl p-4">
-                    <h3 className="text-white font-medium mb-2">Detail Registrasi</h3>
-                    <div className="space-y-2 text-sm text-blue-200">
-                      <p><span className="font-medium">Nama:</span> {selectedRequest.nama}</p>
-                      <p><span className="font-medium">Training:</span> {selectedRequest.judul}</p>
-                      <p><span className="font-medium">Tanggal:</span> {selectedRequest.tanggal}</p>
+                        </div>
                     </div>
-                  </div>
+                )}
 
-                  {/* Comments */}
-                  <div className="space-y-2">
-                    <label className="text-white text-sm font-medium flex items-center">
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Komentar Approval
-                    </label>
-                    <textarea
-                      value={comments}
-                      onChange={(e) => setComments(e.target.value)}
-                      placeholder="Berikan komentar atau catatan untuk keputusan ini..."
-                      rows={3}
-                      className="w-full p-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 backdrop-blur-sm resize-none text-sm"
-                    />
-                  </div>
-
-                  {/* File Upload */}
-                  <div className="space-y-2">
-                    <label className="text-white text-sm font-medium flex items-center">
-                      <Upload className="w-4 h-4 mr-2" />
-                      Lampiran Tambahan
-                    </label>
-                    <div className="border-2 border-dashed border-white/20 rounded-xl p-4 text-center hover:border-white/40 transition-colors duration-200">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="file-upload"
-                      />
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <Upload className="w-8 h-8 text-blue-300 mx-auto mb-2" />
-                        <p className="text-blue-200 text-sm">Klik untuk upload file</p>
-                        <p className="text-blue-300 text-xs">PDF, DOC, JPG (Max 5MB)</p>
-                      </label>
-                    </div>
-                    
-                    {attachedFiles.length > 0 && (
-                      <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {attachedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between bg-white/5 rounded-lg p-2 text-sm">
-                            <div className="flex items-center text-blue-200">
-                              <FileText className="w-4 h-4 mr-2" />
-                              <span className="truncate">{file.name}</span>
-                              <span className="ml-2 text-xs text-blue-300">({formatFileSize(file.size)})</span>
+                {/* --- Action Modal --- */}
+                {showActionModal && selectedApproval && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-lg max-w-md w-full">
+                            <div className={`${actionType === 'approved' ? 'bg-green-600' : 'bg-red-600'} text-white px-6 py-4 flex items-center justify-between`}>
+                                <h2 className="text-xl font-bold">
+                                    {actionType === 'approved' ? 'Setujui' : 'Tolak'} Training
+                                </h2>
+                                <button
+                                    onClick={() => setShowActionModal(false)}
+                                    className="text-white hover:bg-opacity-80 rounded-lg p-1"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
                             </div>
-                            <button
-                              onClick={() => removeFile(index)}
-                              className="text-red-400 hover:text-red-300 p-1"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-3 pt-4">
-                    <button
-                      onClick={() => handleApproval(selectedRequest.id, 'approved')}
-                      disabled={isProcessing}
-                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50"
-                    >
-                      {isProcessing ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      ) : (
-                        <>
-                          <Check className="w-5 h-5" />
-                          <span>Setujui Registrasi</span>
-                        </>
-                      )}
-                    </button>
-                    
-                    <button
-                      onClick={() => handleApproval(selectedRequest.id, 'rejected')}
-                      disabled={isProcessing}
-                      className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50"
-                    >
-                      {isProcessing ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      ) : (
-                        <>
-                          <X className="w-5 h-5" />
-                          <span>Tolak Registrasi</span>
-                        </>
-                      )}
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedRequest(null)}
-                      className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-4 rounded-xl transition-all duration-300 border border-white/20"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <FileText className="w-16 h-16 text-blue-300 mx-auto mb-4 opacity-50" />
-                  <p className="text-blue-200">Pilih registrasi untuk direview</p>
-                </div>
-              )}
+                            
+                            <div className="p-6">
+                                <div className="mb-4">
+                                    <p className="text-gray-600 mb-2">No. Registrasi:</p>
+                                    <p className="font-semibold text-gray-900">{selectedApproval.noReg}</p>
+                                </div>
+                                
+                                <div className="mb-4">
+                                    <p className="text-gray-600 mb-2">Judul Training:</p>
+                                    <p className="font-semibold text-gray-900">{selectedApproval.judulTraining}</p>
+                                </div>
+                                
+                                <div className="mb-4">
+                                    <label className="block text-gray-700 font-semibold mb-2">
+                                        Catatan Review {actionType === 'rejected' && <span className="text-red-500">*</span>}
+                                    </label>
+                                    <textarea
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        rows="4"
+                                        placeholder={`Berikan catatan untuk ${actionType === 'approved' ? 'persetujuan' : 'penolakan'} ini...`}
+                                        value={reviewNote}
+                                        onChange={(e) => setReviewNote(e.target.value)}
+                                    />
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowActionModal(false)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        onClick={handleSubmitAction}
+                                        disabled={actionType === 'rejected' && !reviewNote.trim()}
+                                        className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors ${
+                                            actionType === 'approved'
+                                                ? 'bg-green-600 hover:bg-green-700'
+                                                : 'bg-red-600 hover:bg-red-700'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                        {actionType === 'approved' ? 'Setujui' : 'Tolak'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-
-            {/* Stats Card */}
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-6">
-              <h3 className="text-white font-semibold mb-4">Statistik</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-blue-200">Total Registrasi</span>
-                  <span className="text-white font-medium">{registrationRequests.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-blue-200">Menunggu Approval</span>
-                  <span className="text-yellow-400 font-medium">
-                    {registrationRequests.filter(r => r.status === 'pending').length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-blue-200">Disetujui</span>
-                  <span className="text-green-400 font-medium">
-                    {registrationRequests.filter(r => r.status === 'approved').length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-blue-200">Ditolak</span>
-                  <span className="text-red-400 font-medium">
-                    {registrationRequests.filter(r => r.status === 'rejected').length}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
