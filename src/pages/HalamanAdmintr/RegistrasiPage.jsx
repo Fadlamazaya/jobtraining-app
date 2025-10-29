@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, Clock, Users, Upload, FileText, User, Building, Save, Send, FileX, Eye, Info, Plus, Trash2, ArrowLeft, Download } from 'lucide-react';
 import { collection, serverTimestamp, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebaseConfig';
+// HAPUS: import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../../firebaseConfig'; // TETAPKAN IMPORT db
 
+
+// --- KONSTANTA CLOUDINARY (Ganti dengan data Anda) ---
+const CLOUDINARY_CLOUD_NAME = 'dmzybtzsr'; // Ganti dengan Cloud Name Anda
+const CLOUDINARY_UPLOAD_PRESET = 'jt_uploads'; // Ganti dengan Unsigned Preset Anda
+
+// Catatan: Pastikan Cloudinary upload preset 'jt_uploads' adalah *unsigned*.
 
 // --- FUNGSI UTILITAS ---
 const isTimeOverlap = (start1, end1, start2, end2) => {
+    // Fungsi isTimeOverlap tetap sama
     const toMinutes = (time) => {
         if (time === 'N/A') return 0;
         const [h, m] = time.split(':').map(Number);
@@ -20,6 +27,7 @@ const isTimeOverlap = (start1, end1, start2, end2) => {
 };
 
 const generateNoReg = () => {
+    // Fungsi generateNoReg tetap sama
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -28,8 +36,57 @@ const generateNoReg = () => {
     return `REG-${year}${month}${date}-${random}`;
 };
 
+// --- FUNGSI UPLOAD KE CLOUDINARY ---
+// --- FUNGSI UPLOAD KE CLOUDINARY (Diperbarui untuk Public ID yang aman) ---
+const uploadFileToCloudinary = async (file, noReg) => {
+    if (!file) return null;
 
-// Input Search untuk Instruktur Internal
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    // 💡 PERBAIKAN PEMBERSIHAN NAMA FILE:
+    const originalFileName = file.name;
+    const parts = originalFileName.split('.');
+    
+    // Hapus ekstensi terakhir dari nama file
+    const fileExtension = parts.length > 1 ? '.' + parts.pop() : ''; 
+    const baseFileName = parts.join('.'); 
+
+    // Bersihkan nama file: Hapus karakter non-alfanumerik/spasi/tanda baca, ganti spasi/titik dengan underscore
+    const cleanedBaseName = baseFileName
+        .replace(/[^a-zA-Z0-9\s-]/g, '') // Hapus karakter ilegal
+        .replace(/[\s\.]/g, '_') // Ganti spasi/titik dengan underscore
+        .toLowerCase();
+
+    // Gabungkan NoReg dengan nama file yang bersih. Cloudinary akan menambahkan ekstensi file aslinya.
+    const publicIdWithFolder = `materi_training/${noReg}_${cleanedBaseName}`;
+    
+    formData.append('public_id', publicIdWithFolder);
+
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
+
+    try {
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error('Gagal mengunggah file ke Cloudinary');
+        }
+
+        const data = await response.json();
+        // Mengembalikan URL yang aman (seperti Secure URL) untuk disimpan di Firestore
+        return data.secure_url; 
+    } catch (error) {
+        console.error('Error saat upload ke Cloudinary:', error);
+        throw error;
+    }
+};
+
+
+// ... (InstrukturInternalSearchInput dan InstrukturField tetap sama)
 const InstrukturInternalSearchInput = ({ index, field, value, placeholder, internalInstructors, onSelect, currentInstrukturDetails }) => {
     const [searchTerm, setSearchTerm] = useState(value);
     const [suggestions, setSuggestions] = useState([]);
@@ -203,7 +260,7 @@ const InstrukturField = ({ index, detail, generalInfo, handleInstrukturDetailCha
 };
 
 
-// Input Search untuk Peserta (Trainee)
+// ... (ParticipantSearchInput tetap sama)
 const ParticipantSearchInput = ({ index, field, value, placeholder, internalInstructors, onSelect, currentParticipantDetails }) => {
     const [searchTerm, setSearchTerm] = useState(value);
     const [suggestions, setSuggestions] = useState([]);
@@ -324,8 +381,10 @@ const ParticipantSearchInput = ({ index, field, value, placeholder, internalInst
     );
 };
 
+// ... (Rest of the component code)
 
 const RegistrasiPage = () => {
+    // ... (States remains the same)
     const [activeTab, setActiveTab] = useState('general');
     const [showPreview, setShowPreview] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -346,7 +405,8 @@ const RegistrasiPage = () => {
         instrukturType: '',
         jumlahInstruktur: 1,
         instrukturDetails: [{ nama: '', nikInstansi: '' }], // nikInstansi akan menyimpan NIK atau Instansi
-        materi: null, approvalManager: '', lastApproval: 'Department Head'
+        materi: null, // File object for upload
+        approvalManager: '', lastApproval: 'Department Head'
     });
 
     // State untuk Participant
@@ -369,7 +429,7 @@ const RegistrasiPage = () => {
         { nama: 'Plato', kapasitas: 20 }
     ];
 
-    // --- FETCH DATA ---
+    // --- FETCH DATA (Sama) ---
     useEffect(() => {
         const fetchManagers = async () => {
             setIsManagerLoading(true);
@@ -402,7 +462,7 @@ const RegistrasiPage = () => {
         const fetchApprovedSchedules = async () => {
             setIsScheduleLoading(true);
             try {
-                const q = query(collection(db, 'trainingapp'), where('status', '==', 'Approved'));
+                const q = query(collection(db, 'trainingapp'), where('status', '==', 'approved')); // Pastikan menggunakan 'approved' jika itu status yang Anda simpan
                 const snapshot = await getDocs(q);
                 const schedules = snapshot.docs.map(doc => {
                     const data = doc.data();
@@ -420,6 +480,7 @@ const RegistrasiPage = () => {
         setGeneralInfo(prev => ({ ...prev, noReg: generateNoReg() }));
     }, []);
 
+    // ... (useEffect for totalHari/totalJam and isRoomAvailable remains the same)
     useEffect(() => {
         if (generalInfo.tanggalMulai && generalInfo.tanggalSelesai && generalInfo.jamMulai && generalInfo.jamSelesai) {
             const startDate = new Date(generalInfo.tanggalMulai);
@@ -488,7 +549,7 @@ const RegistrasiPage = () => {
         );
     };
 
-    // --- HANDLER PERUBAHAN INSTRUKTUR (SAMA) ---
+    // ... (All Handlers: Instruktur, Participant, Reset, Draft remains the same)
     const handleJumlahInstrukturChange = (value) => {
         const newJumlah = parseInt(value);
         if (isNaN(newJumlah) || newJumlah < 1) return;
@@ -720,7 +781,7 @@ const RegistrasiPage = () => {
         setActiveTab('participant');
     };
 
-    // --- FUNGSI SUBMIT FINAL ---
+    // --- FUNGSI SUBMIT FINAL (UPDATED) ---
     const handleFinalSubmit = async () => {
         setIsLoading(true);
         let materiURL = null;
@@ -728,15 +789,10 @@ const RegistrasiPage = () => {
         try {
             const { materi, noReg, ...generalInfoToSave } = generalInfo;
 
-            // 💡 LANGKAH 1: UPLOAD FILE KE FIREBASE STORAGE
+            // 💡 LANGKAH 1: UPLOAD FILE KE CLOUDINARY
             if (materi) {
-                const storageRef = ref(storage, `materi_training/${noReg}_${materi.name}`);
-                // Mengunggah file
-                const uploadResult = await uploadBytes(storageRef, materi);
-                // Mendapatkan URL unduhan
-                materiURL = await getDownloadURL(uploadResult.ref);
-                // Konsol log untuk verifikasi
-                console.log("File uploaded, URL:", materiURL);
+                materiURL = await uploadFileToCloudinary(materi, noReg);
+                console.log("File uploaded to Cloudinary, URL:", materiURL);
             }
 
             const registrationData = {
@@ -745,7 +801,7 @@ const RegistrasiPage = () => {
                 participants: participantInfo.participants,
                 totalHari: totalHari, totalJam: totalJam,
                 materiFileName: generalInfo.materi ? generalInfo.materi.name : null,
-                materiURL: materiURL, // 💡 Ini sekarang adalah URL unduhan yang sebenarnya
+                materiURL: materiURL, // 💡 URL Unduhan dari Cloudinary
                 status: 'pending',
                 createdAt: serverTimestamp(),
 
@@ -764,13 +820,13 @@ const RegistrasiPage = () => {
 
         } catch (error) {
             console.error('Error saat menyimpan registrasi: ', error);
-            alert('Gagal mengirim registrasi. Pastikan Firebase Storage sudah dikonfigurasi dan atur Rules-nya.'); // Pesan error yang lebih spesifik
+            alert(`Gagal mengirim registrasi. Error: ${error.message || 'Cek console untuk detail'}`);
         } finally {
             setIsLoading(false);
             setShowPreview(false);
         }
     };
-
+    // ... (InstructorSummary dan RegistrationPreview tetap sama)
     const InstructorSummary = () => {
         const { instrukturType, instrukturDetails, jumlahInstruktur } = generalInfo;
         const typeLabel = instrukturType === 'internal' ? 'NIK' : 'Instansi';
@@ -888,6 +944,7 @@ const RegistrasiPage = () => {
             </div>
         );
     };
+
 
     // --- START JSX RENDER UTAMA ---
 

@@ -1,13 +1,39 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Check, X, Eye, FileText, Clock, CheckCircle, XCircle, Filter, Download } from 'lucide-react';
-import { collection, query, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore'; // 💡 Import untuk operasi DB
-import { db } from '../../firebaseConfig'; // 💡 Import db
+import { Search, Check, X, Eye, FileText, Clock, CheckCircle, XCircle, Filter, Download, Trash2 } from 'lucide-react'; 
+import { collection, query, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore'; 
+import { db } from '../../firebaseConfig'; 
+import { useNavigate } from 'react-router-dom'; // 💡 Tambahkan useNavigate
 
 // Konstanta untuk nama koleksi
 const TRAINING_COLLECTION = 'trainingapp';
-const MANAGER_APPROVAL_COLLECTION = 'approvalManager';
+const MANAGER_APPROVAL_COLLECTION = 'approvalManager'; 
+
+// DAFTAR EKSTENSI DOKUMEN YANG MEMBUTUHKAN TIPE DELIVERY 'RAW' (Tetap sama)
+const DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.doc', '.xls', '.ppt', '.pptx'];
+
+// FUNGSI UNTUK MENGOREKSI URL CLOUDINARY (Tetap sama)
+const getDownloadUrl = (url, fileName) => {
+    if (!url || !fileName) return null;
+    
+    let cleanedUrl = url;
+    const parts = fileName.toLowerCase().split('.');
+    const fileExtension = parts.length > 1 ? '.' + parts.pop() : ''; 
+    
+    if (DOCUMENT_EXTENSIONS.includes(fileExtension)) {
+        cleanedUrl = cleanedUrl.replace('/image/upload/', '/raw/upload/');
+    }
+    cleanedUrl = cleanedUrl.replace(/\/v\d+\//, '/'); 
+    if (fileExtension && cleanedUrl.toLowerCase().endsWith(fileExtension + fileExtension)) {
+        cleanedUrl = cleanedUrl.substring(0, cleanedUrl.length - fileExtension.length);
+    }
+    
+    return cleanedUrl;
+};
+
 
 export default function ApprovalPage() {
+    const navigate = useNavigate(); // 💡 Inisialisasi useNavigate
+    
     const [approvals, setApprovals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -24,11 +50,10 @@ export default function ApprovalPage() {
         rejected: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: XCircle }
     };
 
-    // 💡 FUNGSI FETCH DATA DARI FIRESTORE
+    // 💡 FUNGSI FETCH DATA DARI FIRESTORE (tetap sama)
     const fetchApprovals = useCallback(async () => {
         setIsLoading(true);
         try {
-            // Ambil SEMUA data dari koleksi trainingapp
             const q = query(collection(db, TRAINING_COLLECTION));
             const snapshot = await getDocs(q);
             
@@ -36,10 +61,10 @@ export default function ApprovalPage() {
                 const docData = doc.data();
                 const submittedDate = docData.createdAt?.toDate()?.toLocaleDateString('id-ID') || 'N/A';
                 
-                // Menyesuaikan struktur data untuk tampilan Manager
                 return {
                     id: doc.id,
-                    noReg: doc.id, // Menggunakan Document ID sebagai NoReg
+                    noReg: doc.id, 
+                    // ... (data lainnya)
                     judulTraining: docData.judulTraining,
                     area: docData.area,
                     kelasTraining: docData.kelasTraining,
@@ -48,15 +73,12 @@ export default function ApprovalPage() {
                     jamMulai: docData.jamMulai,
                     jamSelesai: docData.jamSelesai,
                     instrukturType: docData.instrukturType,
-                    
-                    // Data yang dibutuhkan untuk detail dan aksi
                     namaInstruktur: docData.namaInstruktur,
-                    instansi: docData.instrukturNikOrInstansi, // Menggunakan field gabungan NIK/Instansi
-                    materiURL: docData.materiURL, // 💡 URL untuk Download
+                    instansi: docData.instrukturNikOrInstansi, 
+                    materiURL: docData.materiURL, 
                     materiFileName: docData.materiFileName,
                     status: docData.status || 'pending',
                     submittedDate: submittedDate,
-                    submittedBy: docData.submittedBy,
                     approvalDate: docData.approvalDate || '',
                     reviewNote: docData.reviewNote || '',
                 };
@@ -75,7 +97,7 @@ export default function ApprovalPage() {
         fetchApprovals();
     }, [fetchApprovals]);
     
-    // 💡 LOGIKA HANDLE APPROVE/REJECT KE FIRESTORE
+    // 💡 LOGIKA HANDLE APPROVE/REJECT KE FIRESTORE (Dengan Navigasi)
     const updateApprovalStatus = async (noReg, newStatus, note) => {
         const docRef = doc(db, TRAINING_COLLECTION, noReg);
         const approvalDate = new Date().toISOString().split('T')[0];
@@ -87,52 +109,84 @@ export default function ApprovalPage() {
                 status: newStatus,
                 reviewNote: note,
                 approvalDate: approvalDate,
-                approvalManager: selectedData.approvalManager, // Memastikan nama manager tetap ada
-                // Tidak perlu update submittedBy
             });
 
-            // LANGKAH 2: Simpan/Salin ke koleksi approvalManager jika disetujui
-            if (newStatus === 'approved') {
+            // LANGKAH 2: Simpan/Salin ke koleksi approvalManager jika disetujui atau ditolak
+            if (newStatus === 'approved' || newStatus === 'rejected') {
                 const approvedDocRef = doc(db, MANAGER_APPROVAL_COLLECTION, noReg);
                 
-                // Pastikan hanya menyalin data yang relevan setelah status diupdate
-                await setDoc(approvedDocRef, { 
+                const dataToApprove = {
                     ...selectedData, 
                     status: newStatus, 
                     reviewNote: note, 
                     approvalDate: approvalDate,
-                    approvedBy: selectedData.approvalManager // Manager yang meng-approve
-                });
+                    approvedBy: selectedData.approvalManager || 'N/A' 
+                };
+                delete dataToApprove.id; 
+
+                await setDoc(approvedDocRef, dataToApprove); // Menyimpan dokumen ke 'approvalManager'
             }
             
-            // Perbarui state lokal setelah sukses
-            fetchApprovals(); // Refresh data dari DB
             alert(`Registrasi ${noReg} berhasil di${newStatus === 'approved' ? 'setujui' : 'tolak'}!`);
+
+            // 💡 NAVIGASI OTOMATIS JIKA STATUS APPROVED
+            if (newStatus === 'approved') {
+                navigate('/training-implementation'); // Arahkan ke halaman HR
+                return; 
+            }
+            
+            fetchApprovals(); // Refresh data jika rejected
 
         } catch (error) {
             console.error(`Error updating status for ${noReg}:`, error);
             alert(`Gagal memperbarui status registrasi ${noReg}.`);
+        } finally {
+            setShowActionModal(false); 
+            setSelectedApproval(null); 
+            setReviewNote('');
         }
     };
     
+    // 💡 FUNGSI HAPUS REGISTRASI (Delete) - Tetap sama
+    const handleDeleteRegistration = async (noReg) => {
+        if (!window.confirm(`Anda yakin ingin menghapus Registrasi ${noReg} secara PERMANEN? Aksi ini tidak dapat dibatalkan, dan data akan hilang dari database.`)) {
+            return;
+        }
+        // ... (kode hapus)
+        try {
+            await deleteDoc(doc(db, TRAINING_COLLECTION, noReg));
+            const approvedDocRef = doc(db, MANAGER_APPROVAL_COLLECTION, noReg);
+            try {
+                await deleteDoc(approvedDocRef); 
+            } catch (error) {}
+
+            fetchApprovals();
+            alert(`Registrasi ${noReg} berhasil dihapus dari database.`);
+        } catch (error) {
+            console.error(`Error deleting registration ${noReg}:`, error);
+            alert(`Gagal menghapus registrasi ${noReg}.`);
+        }
+    };
+
+
     const handleSubmitAction = () => {
-        if (actionType === 'rejected' && !reviewNote.trim()) {
+        if (!selectedApproval) return;
+        
+        const targetStatus = actionType;
+        let note = reviewNote;
+
+        if (targetStatus === 'rejected' && !note.trim()) {
             alert("Catatan Review harus diisi untuk penolakan.");
             return;
         }
-
-        // Memanggil fungsi update ke Firestore
-        updateApprovalStatus(selectedApproval.noReg, actionType, reviewNote);
-
-        setShowActionModal(false);
-        setSelectedApproval(null);
-        setReviewNote('');
+        
+        updateApprovalStatus(selectedApproval.noReg, targetStatus, note);
     };
     
     const handleAction = (approval, type) => {
         setSelectedApproval(approval);
+        setReviewNote(approval.reviewNote || ''); 
         setActionType(type);
-        setReviewNote('');
         setShowActionModal(true);
     };
 
@@ -154,7 +208,6 @@ export default function ApprovalPage() {
         
         const matchesFilter = filterStatus === 'all' || approval.status === filterStatus;
         
-        // 💡 Hanya tampilkan data yang perlu di-review manager (status 'pending') atau yang sudah di review
         return matchesSearch && matchesFilter;
     });
 
@@ -169,6 +222,7 @@ export default function ApprovalPage() {
         );
     }
 
+    // ... (JSX render)
     return (
         <div className="w-screen h-screen bg-gradient-to-br from-gray-50 to-blue-50 overflow-auto">
             <div className="w-full h-full px-8 py-6">
@@ -310,7 +364,7 @@ export default function ApprovalPage() {
                                                         {/* 💡 TOMBOL DOWNLOAD MATERI */}
                                                         {approval.materiURL && (
                                                             <a
-                                                                href={approval.materiURL}
+                                                                href={getDownloadUrl(approval.materiURL, approval.materiFileName)} 
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
@@ -320,6 +374,7 @@ export default function ApprovalPage() {
                                                             </a>
                                                         )}
                                                         
+                                                        {/* Aksi Approve/Reject/Delete */}
                                                         {approval.status === 'pending' && (
                                                             <>
                                                                 <button
@@ -338,6 +393,15 @@ export default function ApprovalPage() {
                                                                 </button>
                                                             </>
                                                         )}
+                                                        
+                                                        {/* 💡 TOMBOL HAPUS */}
+                                                        <button
+                                                            onClick={() => handleDeleteRegistration(approval.noReg)}
+                                                            className="p-2 text-gray-500 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors"
+                                                            title="Hapus Registrasi Permanen"
+                                                        >
+                                                            <Trash2 className="w-5 h-5" />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -431,7 +495,7 @@ export default function ApprovalPage() {
                                         <div className="mt-1">
                                             {selectedApproval.materiURL ? (
                                                 <a 
-                                                    href={selectedApproval.materiURL} 
+                                                    href={getDownloadUrl(selectedApproval.materiURL, selectedApproval.materiFileName)} // Menggunakan fungsi yang telah diperbarui
                                                     target="_blank" 
                                                     rel="noopener noreferrer" 
                                                     className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"
