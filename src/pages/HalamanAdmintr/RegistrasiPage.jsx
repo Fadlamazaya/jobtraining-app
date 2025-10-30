@@ -12,13 +12,14 @@ const CLOUDINARY_UPLOAD_PRESET = 'jt_uploads'; // Ganti dengan Unsigned Preset A
 // Catatan: Pastikan Cloudinary upload preset 'jt_uploads' adalah *unsigned*.
 
 // --- FUNGSI UTILITAS ---
+const toMinutes = (time) => {
+    if (time === 'N/A') return 0;
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+};
+
 const isTimeOverlap = (start1, end1, start2, end2) => {
     // Fungsi isTimeOverlap tetap sama
-    const toMinutes = (time) => {
-        if (time === 'N/A') return 0;
-        const [h, m] = time.split(':').map(Number);
-        return h * 60 + m;
-    };
     const s1 = toMinutes(start1);
     const e1 = toMinutes(end1);
     const s2 = toMinutes(start2);
@@ -37,7 +38,6 @@ const generateNoReg = () => {
 };
 
 // --- FUNGSI UPLOAD KE CLOUDINARY ---
-// --- FUNGSI UPLOAD KE CLOUDINARY (Diperbarui untuk Public ID yang aman) ---
 const uploadFileToCloudinary = async (file, noReg) => {
     if (!file) return null;
 
@@ -45,23 +45,17 @@ const uploadFileToCloudinary = async (file, noReg) => {
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-    // 💡 PERBAIKAN PEMBERSIHAN NAMA FILE:
     const originalFileName = file.name;
     const parts = originalFileName.split('.');
-    
-    // Hapus ekstensi terakhir dari nama file
-    const fileExtension = parts.length > 1 ? '.' + parts.pop() : ''; 
-    const baseFileName = parts.join('.'); 
+    const fileExtension = parts.length > 1 ? '.' + parts.pop() : '';
+    const baseFileName = parts.join('.');
 
-    // Bersihkan nama file: Hapus karakter non-alfanumerik/spasi/tanda baca, ganti spasi/titik dengan underscore
     const cleanedBaseName = baseFileName
-        .replace(/[^a-zA-Z0-9\s-]/g, '') // Hapus karakter ilegal
-        .replace(/[\s\.]/g, '_') // Ganti spasi/titik dengan underscore
+        .replace(/[^a-zA-Z0-9\s-]/g, '')
+        .replace(/[\s\.]/g, '_')
         .toLowerCase();
 
-    // Gabungkan NoReg dengan nama file yang bersih. Cloudinary akan menambahkan ekstensi file aslinya.
     const publicIdWithFolder = `materi_training/${noReg}_${cleanedBaseName}`;
-    
     formData.append('public_id', publicIdWithFolder);
 
     const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
@@ -77,8 +71,7 @@ const uploadFileToCloudinary = async (file, noReg) => {
         }
 
         const data = await response.json();
-        // Mengembalikan URL yang aman (seperti Secure URL) untuk disimpan di Firestore
-        return data.secure_url; 
+        return data.secure_url;
     } catch (error) {
         console.error('Error saat upload ke Cloudinary:', error);
         throw error;
@@ -86,7 +79,8 @@ const uploadFileToCloudinary = async (file, noReg) => {
 };
 
 
-// ... (InstrukturInternalSearchInput dan InstrukturField tetap sama)
+// --- InstrukturInternalSearchInput, InstrukturField, ParticipantSearchInput (TIDAK BERUBAH) ---
+
 const InstrukturInternalSearchInput = ({ index, field, value, placeholder, internalInstructors, onSelect, currentInstrukturDetails }) => {
     const [searchTerm, setSearchTerm] = useState(value);
     const [suggestions, setSuggestions] = useState([]);
@@ -260,7 +254,7 @@ const InstrukturField = ({ index, detail, generalInfo, handleInstrukturDetailCha
 };
 
 
-// ... (ParticipantSearchInput tetap sama)
+// --- ParticipantSearchInput (TIDAK BERUBAH) ---
 const ParticipantSearchInput = ({ index, field, value, placeholder, internalInstructors, onSelect, currentParticipantDetails }) => {
     const [searchTerm, setSearchTerm] = useState(value);
     const [suggestions, setSuggestions] = useState([]);
@@ -381,8 +375,6 @@ const ParticipantSearchInput = ({ index, field, value, placeholder, internalInst
     );
 };
 
-// ... (Rest of the component code)
-
 const RegistrasiPage = () => {
     // ... (States remains the same)
     const [activeTab, setActiveTab] = useState('general');
@@ -429,12 +421,11 @@ const RegistrasiPage = () => {
         { nama: 'Plato', kapasitas: 20 }
     ];
 
-    // --- FETCH DATA (Sama) ---
+    // --- FETCH DATA (Memuat Jadwal Ter-Approved) ---
     useEffect(() => {
         const fetchManagers = async () => {
             setIsManagerLoading(true);
             try {
-                // Ambil Manager untuk dropdown Approval
                 const qManager = query(collection(db, 'users'), where('position', '==', 'Manager'));
                 const snapshotManager = await getDocs(qManager);
                 const managers = snapshotManager.docs.map(doc => {
@@ -443,12 +434,10 @@ const RegistrasiPage = () => {
                 });
                 setManagerList(managers);
 
-                // Ambil SEMUA Users untuk Instruktur Internal & Peserta
                 const qUsers = query(collection(db, 'users'));
                 const snapshotUsers = await getDocs(qUsers);
                 const users = snapshotUsers.docs.map(doc => {
                     const data = doc.data();
-                    // 💡 Memasukkan 'position' ke state internalInstructors
                     return { name: data.name, nik: data.nik, areaKerja: data.areaKerja, position: data.position };
                 });
                 setInternalInstructors(users.sort((a, b) => a.name.localeCompare(b.name)));
@@ -462,7 +451,8 @@ const RegistrasiPage = () => {
         const fetchApprovedSchedules = async () => {
             setIsScheduleLoading(true);
             try {
-                const q = query(collection(db, 'trainingapp'), where('status', '==', 'approved')); // Pastikan menggunakan 'approved' jika itu status yang Anda simpan
+                // Mengambil SEMUA jadwal yang statusnya 'approved' untuk cek bentrok
+                const q = query(collection(db, 'trainingapp'), where('status', 'in', ['approved', 'Implemented'])); // Membaca approved dan implemented
                 const snapshot = await getDocs(q);
                 const schedules = snapshot.docs.map(doc => {
                     const data = doc.data();
@@ -480,7 +470,7 @@ const RegistrasiPage = () => {
         setGeneralInfo(prev => ({ ...prev, noReg: generateNoReg() }));
     }, []);
 
-    // ... (useEffect for totalHari/totalJam and isRoomAvailable remains the same)
+    // ... (useEffect for totalHari/totalJam remains the same)
     useEffect(() => {
         if (generalInfo.tanggalMulai && generalInfo.tanggalSelesai && generalInfo.jamMulai && generalInfo.jamSelesai) {
             const startDate = new Date(generalInfo.tanggalMulai);
@@ -502,6 +492,7 @@ const RegistrasiPage = () => {
         }
     }, [generalInfo.tanggalMulai, generalInfo.tanggalSelesai, generalInfo.jamMulai, generalInfo.jamSelesai]);
 
+    // --- FUNGSI CEK BENTROK UTAMA (isRoomAvailable) ---
     const isRoomAvailable = (roomName) => {
         const { tanggalMulai, tanggalSelesai, jamMulai, jamSelesai } = generalInfo;
 
@@ -514,9 +505,12 @@ const RegistrasiPage = () => {
             if (schedule.room !== roomName) return false;
             const scheduledStart = new Date(schedule.dateStart);
             const scheduledEnd = new Date(schedule.dateEnd);
+            
+            // 1. Cek tumpang tindih TANGGAL
             const dateOverlap = newStart <= scheduledEnd && newEnd >= scheduledStart;
 
             if (dateOverlap) {
+                // 2. Jika tanggal tumpang tindih, cek tumpang tindih JAM
                 return isTimeOverlap(jamMulai, jamSelesai, schedule.timeStart, schedule.timeEnd);
             }
             return false;
@@ -525,6 +519,7 @@ const RegistrasiPage = () => {
         return !isConflict;
     };
 
+    // --- KOMPONEN ROOM OPTIONS (Menampilkan status bentrok) ---
     const RoomOptions = () => {
         if (isScheduleLoading) return <option>Memuat ketersediaan ruangan...</option>;
 
@@ -539,9 +534,9 @@ const RegistrasiPage = () => {
                         <option
                             key={kelas.nama}
                             value={kelas.nama}
-                            disabled={!isAvailable}
+                            disabled={!isAvailable} // Menonaktifkan opsi yang bentrok
                         >
-                            {kelas.nama} {capacityStatus} {!isAvailable && "— BENTROK JADWAL"}
+                            {kelas.nama} {capacityStatus} {!isAvailable && "— SUDAH TERBOOKING"}
                         </option>
                     );
                 })}
@@ -549,7 +544,7 @@ const RegistrasiPage = () => {
         );
     };
 
-    // ... (All Handlers: Instruktur, Participant, Reset, Draft remains the same)
+    // ... (Handler Instruktur)
     const handleJumlahInstrukturChange = (value) => {
         const newJumlah = parseInt(value);
         if (isNaN(newJumlah) || newJumlah < 1) return;
@@ -762,7 +757,7 @@ const RegistrasiPage = () => {
         setActiveTab('participant');
     };
 
-
+    // --- HANDLE SAVE GENERAL (Dengan Pengecekan Bentrok) ---
     const handleSaveGeneral = () => {
         if (!isGeneralFormValid) {
             setShowAlert(true);
@@ -772,14 +767,17 @@ const RegistrasiPage = () => {
         }
 
         const { kelasTraining } = generalInfo;
+        // Pengecekan Bentrok Jadwal
         if (kelasTraining && !isRoomAvailable(kelasTraining)) {
             setShowAlert(true);
-            alert(`Kelas ${kelasTraining} bentrok dengan jadwal yang sudah di-approve. Silakan pilih tanggal atau jam yang berbeda.`);
+            // Pesan Notifikasi Sesuai Permintaan
+            alert(`Kelas ${kelasTraining} sudah terbooking! Silakan pilih tanggal atau jam yang berbeda.`);
             setTimeout(() => setShowAlert(false), 3000);
-            return;
+            return; // BLOKIR perpindahan tab/halaman jika bentrok
         }
         setActiveTab('participant');
     };
+    // END PERBAIKAN handleSaveGeneral
 
     // --- FUNGSI SUBMIT FINAL (UPDATED) ---
     const handleFinalSubmit = async () => {
@@ -792,7 +790,6 @@ const RegistrasiPage = () => {
             // 💡 LANGKAH 1: UPLOAD FILE KE CLOUDINARY
             if (materi) {
                 materiURL = await uploadFileToCloudinary(materi, noReg);
-                console.log("File uploaded to Cloudinary, URL:", materiURL);
             }
 
             const registrationData = {
@@ -980,34 +977,43 @@ const RegistrasiPage = () => {
                                 <h2 className="text-2xl font-bold text-blue-900 mb-6">General Information</h2>
 
                                 <div><label className="block text-sm font-medium text-blue-700 mb-2">No. Registrasi</label><input type="text" value={generalInfo.noReg} disabled className="w-full p-3 border border-blue-200 rounded-lg bg-gray-100 text-gray-600" /></div>
-                                <div><label className="block text-sm font-medium text-blue-700 mb-2">Judul Training *</label><input type="text" value={generalInfo.judulTraining} onChange={(e) => handleGeneralInfoChange('judulTraining', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Masukkan judul training" /></div>
-                                <div><label className="block text-sm font-medium text-blue-700 mb-2">Area/Unit *</label><select value={generalInfo.area} onChange={(e) => handleGeneralInfoChange('area', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"><option value="">Pilih Area/Unit</option>{areaOptions.map(area => (<option key={area} value={area}>{area}</option>))}</select></div>
+                                <div><label className="block text-sm font-medium text-blue-700 mb-2">Judul Training </label><input type="text" value={generalInfo.judulTraining} onChange={(e) => handleGeneralInfoChange('judulTraining', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Masukkan judul training" /></div>
+                                <div><label className="block text-sm font-medium text-blue-700 mb-2">Area/Unit </label><select value={generalInfo.area} onChange={(e) => handleGeneralInfoChange('area', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"><option value="">Pilih Area/Unit</option>{areaOptions.map(area => (<option key={area} value={area}>{area}</option>))}</select></div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-blue-700 mb-2">Kelas Training *</label>
+                                    <label className="block text-sm font-medium text-blue-700 mb-2">Kelas Training </label>
                                     <select
                                         value={generalInfo.kelasTraining}
-                                        onChange={(e) => handleGeneralInfoChange('kelasTraining', e.target.value)}
+                                        onChange={(e) => {
+                                            const selectedRoom = e.target.value;
+                                            // **BLOKIR PERUBAHAN STATE DI SINI JIKA BENTROK**
+                                            if (selectedRoom && !isRoomAvailable(selectedRoom)) {
+                                                alert(`Kelas ${selectedRoom} sudah terbooking! Silakan pilih yang lain.`);
+                                                return; // Hentikan pembaruan state
+                                            }
+                                            handleGeneralInfoChange('kelasTraining', selectedRoom);
+                                        }}
                                         className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <RoomOptions />
                                     </select>
+                                    {/* Pesan peringatan merah yang menampilkan status bentrok */}
                                     {generalInfo.kelasTraining && !isRoomAvailable(generalInfo.kelasTraining) && (
-                                        <p className="text-sm text-red-500 mt-2">⚠️ Peringatan: Kelas ini BENTROK dengan jadwal lain pada tanggal/jam yang sama.</p>
+                                        <p className="text-sm text-red-500 mt-2">⚠️ Peringatan: Kelas ini SUDAH TERBOOKING! Silakan ubah jadwal atau kelas.</p>
                                     )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Tanggal Mulai *</label><input type="date" value={generalInfo.tanggalMulai} onChange={(e) => handleGeneralInfoChange('tanggalMulai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
-                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Tanggal Selesai *</label><input type="date" value={generalInfo.tanggalSelesai} onChange={(e) => handleGeneralInfoChange('tanggalSelesai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
-                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Jam Mulai *</label><input type="time" value={generalInfo.jamMulai} onChange={(e) => handleGeneralInfoChange('jamMulai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
-                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Jam Selesai *</label><input type="time" value={generalInfo.jamSelesai} onChange={(e) => handleGeneralInfoChange('jamSelesai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
+                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Tanggal Mulai </label><input type="date" value={generalInfo.tanggalMulai} onChange={(e) => handleGeneralInfoChange('tanggalMulai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
+                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Tanggal Selesai </label><input type="date" value={generalInfo.tanggalSelesai} onChange={(e) => handleGeneralInfoChange('tanggalSelesai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
+                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Jam Mulai </label><input type="time" value={generalInfo.jamMulai} onChange={(e) => handleGeneralInfoChange('jamMulai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
+                                    <div><label className="block text-sm font-medium text-blue-700 mb-2">Jam Selesai </label><input type="time" value={generalInfo.jamSelesai} onChange={(e) => handleGeneralInfoChange('jamSelesai', e.target.value)} className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
                                 </div>
 
                                 {totalHari > 0 && (<div className="bg-blue-50 p-4 rounded-lg"><div className="flex items-center space-x-4"><div className="flex items-center"><Calendar className="w-5 h-5 text-blue-600 mr-2" /><span className="text-blue-800 font-medium">Total Hari: {totalHari} hari</span></div><div className="flex items-center"><Clock className="w-5 h-5 text-blue-600 mr-2" /><span className="text-blue-800 font-medium">Total Jam: {totalJam.toFixed(1)} jam</span></div></div></div>)}
 
                                 <div>
-                                    <label className="block text-sm font-medium text-blue-700 mb-2">Tipe Instruktur *</label>
+                                    <label className="block text-sm font-medium text-blue-700 mb-2">Tipe Instruktur </label>
                                     <select
                                         value={generalInfo.instrukturType}
                                         onChange={(e) => handleGeneralInfoChange('instrukturType', e.target.value)}
@@ -1021,7 +1027,7 @@ const RegistrasiPage = () => {
                                             <h3 className="text-lg font-semibold text-gray-800 mb-4">Detail Instruktur {generalInfo.instrukturType === 'internal' ? 'Internal' : 'External'}</h3>
 
                                             <div className="mb-4">
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Jumlah Instruktur *</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Jumlah Instruktur </label>
                                                 <div className="flex items-center space-x-2">
                                                     <input
                                                         type="number"
@@ -1060,7 +1066,7 @@ const RegistrasiPage = () => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-blue-700 mb-2">Approval Manager *</label>
+                                        <label className="block text-sm font-medium text-blue-700 mb-2">Approval Manager </label>
                                         <select
                                             value={generalInfo.approvalManager}
                                             onChange={(e) => handleGeneralInfoChange('approvalManager', e.target.value)}

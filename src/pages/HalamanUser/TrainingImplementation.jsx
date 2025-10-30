@@ -203,6 +203,7 @@ const TrainingImplementation = () => {
         <div className="min-h-screen bg-gray-100 p-6 pt-24 flex justify-center">
             <HRHeader /> 
 
+            {/* Kontainer Utama Dua Kolom */}
             <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
                 {/* 1. KOLOM KIRI: DAFTAR REGISTRASI */}
@@ -224,7 +225,7 @@ const TrainingImplementation = () => {
                     ) : (
                         <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-2">
                             {isLoading ? <p className="p-4 text-center text-blue-500">Memuat data...</p> : 
-                              registrations.map(reg => (
+                            registrations.map(reg => (
                                 <RegistrationCard key={reg.id} reg={reg} />
                             ))}
                         </div>
@@ -292,6 +293,20 @@ const TrainingImplementation = () => {
                                     </p>
                                     {selectedReg.commentManager && <p className="text-xs mt-2 italic">Komen Manager: "{selectedReg.commentManager}"</p>}
                                     {selectedReg.hrComment && <p className="text-sm mt-2 italic border-t pt-2">Komen HR: "{selectedReg.hrComment}"</p>}
+                                    
+                                    {/* START INTEGRASI ATTENDANCE PDF */}
+                                    {selectedReg.status === 'Selesai/Implementasi' && (
+                                        <div className="mt-3 pt-3 border-t">
+                                            <AttendancePDF 
+                                                participantsData={selectedReg.participants} 
+                                                trainingTitle={selectedReg.judulTraining}
+                                                registrationData={selectedReg} 
+                                            />
+                                        </div>
+                                    )}
+                                    {/* END INTEGRASI ATTENDANCE PDF */}
+                                    
+                                    <button onClick={() => setSelectedReg(null)} className="mt-3 w-full py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Tutup Review</button>
                                 </div>
                             )}
 
