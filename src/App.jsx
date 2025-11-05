@@ -25,7 +25,7 @@ import HomePageHR from "./pages/HalamanUser/HomePageHR";
 import HRLayout from "./components/HalamanHR/HrLayout";
 import TrainingRecords from "./pages/HalamanUser/trainingRecords";
 import FormEvaluation from "./pages/HalamanUser/FormEvaluation";
-
+import AssesmentPage from "./pages/HalamanAdmintr/AssesmentPage";
 
 
 function App() {
@@ -55,6 +55,7 @@ function App() {
         <Route path="home" element={<HomePage />} />
         <Route path="registrasi" element={<RegistrasiPage />} />
         <Route path="approval" element={<ApprovalPage />} />
+        <Route path="assesment" element={<AssesmentPage />} />
       </Route>
 
       {/* Semua halaman user dibungkus HRLayout */}

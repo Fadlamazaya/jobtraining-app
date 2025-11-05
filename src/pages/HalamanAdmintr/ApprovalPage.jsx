@@ -1,45 +1,40 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Check, X, Eye, FileText, Clock, CheckCircle, XCircle, Filter, Download, Trash2, Users, User as UserIcon } from 'lucide-react';
-import { collection, query, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
-import { useNavigate } from 'react-router-dom';
-
+import { Search, Check, X, Eye, FileText, Clock, CheckCircle, XCircle, Filter, Download, Trash2, Users, User as UserIcon } from 'lucide-react'; 
+import { collection, query, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore'; 
+import { db } from '../../firebaseConfig'; 
+import { useNavigate } from 'react-router-dom'; 
 
 // Konstanta untuk nama koleksi
 const TRAINING_COLLECTION = 'trainingapp';
-const MANAGER_APPROVAL_COLLECTION = 'approvalManager';
-
+const MANAGER_APPROVAL_COLLECTION = 'approvalManager'; 
 
 // DAFTAR EKSTENSI DOKUMEN YANG MEMBUTUHKAN TIPE DELIVERY 'RAW' (Tetap sama)
 const DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.doc', '.xls', '.ppt', '.pptx'];
 
-
-// FUNGSI UNTUK MENGOREKSI URL CLOUDINARY (Tetap sama)
+// FUNGSI UNTUK MENGOREKSI URL CLOUDINARY (Logika sudah stabil)
 const getDownloadUrl = (url, fileName) => {
     if (!url || !fileName) return null;
-   
+    
     let cleanedUrl = url;
     const parts = fileName.toLowerCase().split('.');
-    const fileExtension = parts.length > 1 ? '.' + parts.pop() : '';
-   
+    const fileExtension = parts.length > 1 ? '.' + parts.pop() : ''; 
+    
     if (DOCUMENT_EXTENSIONS.includes(fileExtension)) {
         cleanedUrl = cleanedUrl.replace('/image/upload/', '/raw/upload/');
     }
-    cleanedUrl = cleanedUrl.replace(/\/v\d+\//, '/');
+    cleanedUrl = cleanedUrl.replace(/\/v\d+\//, '/'); 
     if (fileExtension && cleanedUrl.toLowerCase().endsWith(fileExtension + fileExtension)) {
         cleanedUrl = cleanedUrl.substring(0, cleanedUrl.length - fileExtension.length);
     }
-   
+    
     return cleanedUrl;
 };
-
 
 // Helper untuk memformat tanggal (YYYY-MM-DD)
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-        // Menggunakan toLocaleDateString untuk tampilan yang lebih ramah
-        const date = new Date(dateString);
+        const date = new Date(dateString); 
         if (isNaN(date)) return dateString;
         return date.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' });
     } catch (e) {
@@ -48,11 +43,9 @@ const formatDate = (dateString) => {
 };
 
 
-
-
 export default function ApprovalPage() {
-    const navigate = useNavigate();
-   
+    const navigate = useNavigate(); 
+    
     const [approvals, setApprovals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -63,13 +56,11 @@ export default function ApprovalPage() {
     const [actionType, setActionType] = useState('');
     const [reviewNote, setReviewNote] = useState('');
 
-
     const statusConfig = {
         pending: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
         approved: { label: 'Disetujui', color: 'bg-green-100 text-green-700', icon: CheckCircle },
         rejected: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: XCircle }
     };
-
 
     // FUNGSI FETCH DATA DARI FIRESTORE (tetap sama)
     const fetchApprovals = useCallback(async () => {
@@ -77,14 +68,14 @@ export default function ApprovalPage() {
         try {
             const q = query(collection(db, TRAINING_COLLECTION));
             const snapshot = await getDocs(q);
-           
+            
             const data = snapshot.docs.map(doc => {
                 const docData = doc.data();
                 const submittedDate = docData.createdAt?.toDate()?.toLocaleDateString('id-ID') || 'N/A';
-               
+                
                 return {
                     id: doc.id,
-                    noReg: doc.id,
+                    noReg: doc.id, 
                     judulTraining: docData.judulTraining,
                     area: docData.area,
                     kelasTraining: docData.kelasTraining,
@@ -94,10 +85,10 @@ export default function ApprovalPage() {
                     jamSelesai: docData.jamSelesai,
                     instrukturType: docData.instrukturType,
                     namaInstruktur: docData.namaInstruktur,
-                    instansi: docData.instrukturNikOrInstansi,
-                    materiURL: docData.materiURL,
+                    instansi: docData.instrukturNikOrInstansi, 
+                    materiURL: docData.materiURL, 
                     materiFileName: docData.materiFileName,
-                    participants: docData.participants || [], // Ambil daftar peserta
+                    participants: docData.participants || [], 
                     status: docData.status || 'pending',
                     submittedDate: submittedDate,
                     approvalDate: docData.approvalDate || '',
@@ -109,23 +100,21 @@ export default function ApprovalPage() {
         } catch (error) {
             console.error("Error fetching approvals:", error);
             alert("Gagal memuat data dari Firestore.");
-            setApprovals([]);
+            setApprovals([]); 
         } finally {
             setIsLoading(false);
         }
     }, []);
 
-
     useEffect(() => {
         fetchApprovals();
     }, [fetchApprovals]);
-   
+    
     // LOGIKA HANDLE APPROVE/REJECT KE FIRESTORE (Dengan Navigasi)
     const updateApprovalStatus = async (noReg, newStatus, note) => {
         const docRef = doc(db, TRAINING_COLLECTION, noReg);
         const approvalDate = new Date().toISOString().split('T')[0];
         const selectedData = approvals.find(a => a.noReg === noReg);
-
 
         try {
             // LANGKAH 1: Update status di koleksi utama (trainingapp)
@@ -135,46 +124,42 @@ export default function ApprovalPage() {
                 approvalDate: approvalDate,
             });
 
-
             // LANGKAH 2: Simpan/Salin ke koleksi approvalManager
             if (newStatus === 'approved' || newStatus === 'rejected') {
                 const approvedDocRef = doc(db, MANAGER_APPROVAL_COLLECTION, noReg);
-               
+                
                 const dataToApprove = {
-                    ...selectedData,
-                    status: newStatus,
-                    reviewNote: note,
+                    ...selectedData, 
+                    status: newStatus, 
+                    reviewNote: note, 
                     approvalDate: approvalDate,
-                    approvedBy: selectedData.approvalManager || 'N/A'
+                    approvedBy: selectedData.approvalManager || 'N/A' 
                 };
-                delete dataToApprove.id;
-
+                delete dataToApprove.id; 
 
                 await setDoc(approvedDocRef, dataToApprove);
             }
-           
+            
             alert(`Registrasi ${noReg} berhasil di${newStatus === 'approved' ? 'setujui' : 'tolak'}!`);
 
-
-            // NAVIGASI OTOMATIS JIKA STATUS APPROVED
-            if (newStatus === 'approved') {
-                navigate('/training-implementation');
-                return;
-            }
-           
-            fetchApprovals(); // Refresh data jika rejected
-
+            // 💡 PERBAIKAN KRITIS: Hapus navigasi otomatis jika status Approved
+            // if (newStatus === 'approved') {
+            //     navigate('/training-implementation'); 
+            //     return; 
+            // }
+            
+            fetchApprovals(); // Refresh data untuk menampilkan status baru di tabel
 
         } catch (error) {
             console.error(`Error updating status for ${noReg}:`, error);
             alert(`Gagal memperbarui status registrasi ${noReg}.`);
         } finally {
-            setShowActionModal(false);
-            setSelectedApproval(null);
+            setShowActionModal(false); 
+            setSelectedApproval(null); 
             setReviewNote('');
         }
     };
-   
+    
     // FUNGSI HAPUS REGISTRASI (Delete)
     const handleDeleteRegistration = async (noReg) => {
         if (!window.confirm(`Anda yakin ingin menghapus Registrasi ${noReg} secara PERMANEN? Aksi ini tidak dapat dibatalkan, dan data akan hilang dari database.`)) {
@@ -184,9 +169,8 @@ export default function ApprovalPage() {
             await deleteDoc(doc(db, TRAINING_COLLECTION, noReg));
             const approvedDocRef = doc(db, MANAGER_APPROVAL_COLLECTION, noReg);
             try {
-                await deleteDoc(approvedDocRef);
+                await deleteDoc(approvedDocRef); 
             } catch (error) {}
-
 
             fetchApprovals();
             alert(`Registrasi ${noReg} berhasil dihapus dari database.`);
@@ -197,58 +181,51 @@ export default function ApprovalPage() {
     };
 
 
-
-
     const handleSubmitAction = () => {
         if (!selectedApproval) return;
-       
+        
         const targetStatus = actionType;
         let note = reviewNote;
-
 
         if (targetStatus === 'rejected' && !note.trim()) {
             alert("Catatan Review harus diisi untuk penolakan.");
             return;
         }
-       
+        
         updateApprovalStatus(selectedApproval.noReg, targetStatus, note);
     };
-   
+    
     const handleAction = (approval, type) => {
         setSelectedApproval(approval);
-        setReviewNote(approval.reviewNote || '');
+        setReviewNote(approval.reviewNote || ''); 
         setActionType(type);
         setShowActionModal(true);
     };
-
 
     const handleViewDetail = (approval) => {
         setSelectedApproval(approval);
         setShowDetailModal(true);
     };
 
-
     const getStatusCount = (status) => {
         return approvals.filter(a => a.status === status).length;
     };
 
 
-
-
     const filteredApprovals = approvals.filter(approval => {
-        const matchesSearch =
+        const matchesSearch = 
             approval.noReg.toLowerCase().includes(searchTerm.toLowerCase()) ||
             approval.judulTraining.toLowerCase().includes(searchTerm.toLowerCase()) ||
             approval.area.toLowerCase().includes(searchTerm.toLowerCase());
-       
+        
         const matchesFilter = filterStatus === 'all' || approval.status === filterStatus;
-       
-        // 💡 PERBAIKAN: Memastikan status yang sudah di-approved/rejected tetap terlihat
-        const isVisible = ['pending', 'approved', 'rejected'].includes(approval.status) || filterStatus === 'all';
-       
-        return matchesSearch && matchesFilter && isVisible;
+        
+        // Memastikan hanya status yang relevan di tingkat Manager (pending, approved, rejected) yang terlihat saat disaring
+        const isManagerLevelStatus = ['pending', 'approved', 'rejected'].includes(approval.status);
+        
+        // Tampilkan semua jika filter 'all' atau status cocok
+        return matchesSearch && (filterStatus === 'all' || approval.status === filterStatus);
     });
-
 
     if (isLoading) {
         return (
@@ -261,7 +238,6 @@ export default function ApprovalPage() {
         );
     }
 
-
     // KOMPONEN DETAIL MODAL LENGKAP UNTUK MANAGER
     const FullDetailModal = ({ reg, onClose }) => (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -272,7 +248,7 @@ export default function ApprovalPage() {
                         <X className="w-6 h-6" />
                     </button>
                 </div>
-               
+                
                 <div className="p-6">
                     {/* RINGKASAN UTAMA */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-4 mb-4">
@@ -291,7 +267,7 @@ export default function ApprovalPage() {
                             <p className="text-gray-900">{reg.tanggalMulai} - {reg.tanggalSelesai}</p>
                             <p className="text-xs text-gray-600">Waktu: {reg.jamMulai} - {reg.jamSelesai}</p>
                         </div>
-                       
+                        
                         <div className="md:col-span-3">
                             <p className="text-sm font-semibold text-gray-600">Instruktur</p>
                             {/* Menggunakan namaInstruktur dan instansi dari field utama */}
@@ -299,7 +275,7 @@ export default function ApprovalPage() {
                             <p className="text-xs text-gray-600">{reg.instrukturType === 'internal' ? 'NIK' : 'Instansi'}: {reg.instansi}</p>
                         </div>
                     </div>
-                   
+                    
                     {/* FILE MATERI & STATUS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-b pb-4 mb-4">
                         <div>
@@ -312,10 +288,10 @@ export default function ApprovalPage() {
                         <div>
                             <p className="text-sm font-semibold text-gray-600">Materi File</p>
                             {reg.materiURL ? (
-                                <a
+                                <a 
                                     href={getDownloadUrl(reg.materiURL, reg.materiFileName)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
                                     className="inline-flex items-center mt-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
                                 >
                                     <Download className="w-4 h-4 mr-1"/> {reg.materiFileName || 'Unduh File'}
@@ -325,7 +301,6 @@ export default function ApprovalPage() {
                             )}
                         </div>
                     </div>
-
 
                     {/* DAFTAR PESERTA */}
                     <h4 className="font-bold text-md text-blue-700 mb-3 flex items-center"><Users className="w-4 h-4 mr-2"/> Daftar Peserta ({reg.participants.length} Orang)</h4>
@@ -365,18 +340,15 @@ export default function ApprovalPage() {
     );
 
 
-
-
     return (
         <div className="w-screen h-screen bg-gradient-to-br from-gray-50 to-blue-50 overflow-auto">
             <div className="w-full h-full px-8 py-6">
-               
+                
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-800 mb-2">Approval Training</h1>
                     <p className="text-gray-600">Kelola persetujuan registrasi training dari tim Anda</p>
                 </div>
-
 
                 {/* --- Stats Cards --- */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -389,7 +361,7 @@ export default function ApprovalPage() {
                         <FileText className="w-8 h-8 text-blue-500" />
                       </div>
                     </div>
-                   
+                    
                     <div className="bg-white rounded-lg shadow p-5 border-l-4 border-yellow-500">
                       <div className="flex items-center justify-between">
                         <div>
@@ -399,7 +371,7 @@ export default function ApprovalPage() {
                         <Clock className="w-8 h-8 text-yellow-500" />
                       </div>
                     </div>
-                   
+                    
                     <div className="bg-white rounded-lg shadow p-5 border-l-4 border-green-500">
                       <div className="flex items-center justify-between">
                         <div>
@@ -409,7 +381,7 @@ export default function ApprovalPage() {
                         <CheckCircle className="w-8 h-8 text-green-500" />
                       </div>
                     </div>
-                   
+                    
                     <div className="bg-white rounded-lg shadow p-5 border-l-4 border-red-500">
                       <div className="flex items-center justify-between">
                         <div>
@@ -420,7 +392,6 @@ export default function ApprovalPage() {
                       </div>
                     </div>
                 </div>
-
 
                 {/* --- Search and Filter --- */}
                 <div className="bg-white rounded-lg shadow p-5 mb-6">
@@ -435,7 +406,7 @@ export default function ApprovalPage() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                       
+                        
                         <div className="flex items-center gap-2">
                             <Filter className="text-gray-400 w-5 h-5" />
                             <select
@@ -451,7 +422,6 @@ export default function ApprovalPage() {
                         </div>
                     </div>
                 </div>
-
 
                 {/* --- Approvals List --- */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -507,11 +477,11 @@ export default function ApprovalPage() {
                                                         >
                                                             <Eye className="w-5 h-5" />
                                                         </button>
-                                                       
+                                                        
                                                         {/* 💡 TOMBOL DOWNLOAD MATERI */}
                                                         {approval.materiURL && (
                                                             <a
-                                                                href={getDownloadUrl(approval.materiURL, approval.materiFileName)}
+                                                                href={getDownloadUrl(approval.materiURL, approval.materiFileName)} 
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
@@ -520,7 +490,7 @@ export default function ApprovalPage() {
                                                                 <Download className="w-5 h-5" />
                                                             </a>
                                                         )}
-                                                       
+                                                        
                                                         {/* Aksi Approve/Reject/Delete */}
                                                         {approval.status === 'pending' && (
                                                             <>
@@ -540,7 +510,7 @@ export default function ApprovalPage() {
                                                                 </button>
                                                             </>
                                                         )}
-                                                       
+                                                        
                                                         {/* 💡 TOMBOL HAPUS */}
                                                         <button
                                                             onClick={() => handleDeleteRegistration(approval.noReg)}
@@ -560,15 +530,13 @@ export default function ApprovalPage() {
                     </div>
                 </div>
 
-
                 {/* --- Detail Modal --- */}
                 {showDetailModal && selectedApproval && (
-                    <FullDetailModal
-                        reg={selectedApproval}
+                    <FullDetailModal 
+                        reg={selectedApproval} 
                         onClose={() => setShowDetailModal(false)}
                     />
                 )}
-
 
                 {/* --- Action Modal --- */}
                 {showActionModal && selectedApproval && (
@@ -586,18 +554,18 @@ export default function ApprovalPage() {
                                     <X className="w-6 h-6" />
                                 </button>
                             </div>
-                           
+                            
                             <div className="p-6">
                                 <div className="mb-4">
                                     <p className="text-gray-600 mb-2">No. Registrasi:</p>
                                     <p className="font-semibold text-gray-900">{selectedApproval.noReg}</p>
                                 </div>
-                               
+                                
                                 <div className="mb-4">
                                     <p className="text-gray-600 mb-2">Judul Training:</p>
                                     <p className="font-semibold text-gray-900">{selectedApproval.judulTraining}</p>
                                 </div>
-                               
+                                
                                 <div className="mb-4">
                                     <label className="block text-gray-700 font-semibold mb-2">
                                         Catatan Review {actionType === 'rejected' && <span className="text-red-500">*</span>}
@@ -610,7 +578,7 @@ export default function ApprovalPage() {
                                         onChange={(e) => setReviewNote(e.target.value)}
                                     />
                                 </div>
-                               
+                                
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => setShowActionModal(false)}

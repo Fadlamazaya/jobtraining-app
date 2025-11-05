@@ -9,8 +9,6 @@ import { db } from '../../firebaseConfig'; // TETAPKAN IMPORT db
 const CLOUDINARY_CLOUD_NAME = 'dmzybtzsr'; // Ganti dengan Cloud Name Anda
 const CLOUDINARY_UPLOAD_PRESET = 'jt_uploads'; // Ganti dengan Unsigned Preset Anda
 
-// Catatan: Pastikan Cloudinary upload preset 'jt_uploads' adalah *unsigned*.
-
 // --- FUNGSI UTILITAS ---
 const toMinutes = (time) => {
     if (time === 'N/A') return 0;

@@ -3,7 +3,9 @@ import React, { useState, useEffect, useMemo } from "react";
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'; 
 import { db } from '../../firebaseConfig'; 
 import HRHeader from "../../components/HalamanHR/HRHeader";
-import { ListChecks, Clock, Calendar, Users, CheckCircle, Search } from 'lucide-react'; // Import Search
+import { ListChecks, Clock, Calendar, Users, CheckCircle, Search, Download } from 'lucide-react'; // Import Download
+// 💡 IMPORT KOMPONEN PDF
+import TrainingReportPDF from './TrainingReportPDF'; // Asumsi lokasi file TrainingReportPDF.jsx adalah dalam folder yang sama
 
 const TrainingRecords = () => {
     const [trainingRecords, setTrainingRecords] = useState([]);
@@ -63,11 +65,15 @@ const TrainingRecords = () => {
                         // Instruktur Utama
                         instruktur: data.namaInstruktur || data.instrukturDetails?.[0]?.nama || 'N/A', 
                         
-                        // Daftar Peserta UTUH
+                        // Daftar Peserta UTUH (Termasuk Nilai Pretest/Posttest)
                         participants: data.participants || [],
                         
                         tanggalSelesaiOriginal: data.tanggalSelesai,
                         tanggalMulaiOriginal: data.tanggalMulai,
+                        // 💡 Tambahkan data yang dibutuhkan PDF (agar tidak perlu load ulang)
+                        jamMulai: data.jamMulai || 'N/A',
+                        jamSelesai: data.jamSelesai || 'N/A',
+                        namaInstruktur: data.namaInstruktur || data.instrukturDetails?.[0]?.nama || 'N/A',
                     });
                 }
             });
@@ -169,6 +175,8 @@ const TrainingRecords = () => {
                                     <th className="px-4 py-3 text-center text-sm font-semibold w-auto">Kelas & Area</th>
                                     <th className="px-4 py-3 text-center text-sm font-semibold w-1/6">Periode</th>
                                     <th className="px-4 py-3 text-center text-sm font-semibold w-auto">Total Jam</th>
+                                    {/* 💡 TAMBAHKAN KOLOM AKSI */}
+                                    <th className="px-4 py-3 text-center text-sm font-semibold w-1/6">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -215,6 +223,23 @@ const TrainingRecords = () => {
                                         <td className="px-4 py-4 text-sm text-center font-medium align-top">
                                             <Clock className="w-4 h-4 inline mr-1 text-orange-500" />
                                             {record.totalJam.toFixed(1)} jam
+                                        </td>
+                                        
+                                        {/* 💡 KOLOM 7: AKSI (Download PDF) */}
+                                        <td className="px-4 py-4 text-center align-top">
+                                            <TrainingReportPDF 
+                                                participantsData={record.participants.filter(p => p.role === 'T')} // Hanya Trainee yang diasesmen
+                                                trainingTitle={record.judulTraining}
+                                                registrationData={{
+                                                    noReg: record.noReg,
+                                                    area: record.area,
+                                                    namaInstruktur: record.namaInstruktur,
+                                                    tanggalMulai: record.tanggalMulaiOriginal,
+                                                    tanggalSelesai: record.tanggalSelesaiOriginal,
+                                                    jamMulai: record.jamMulai,
+                                                    jamSelesai: record.jamSelesai,
+                                                }}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
