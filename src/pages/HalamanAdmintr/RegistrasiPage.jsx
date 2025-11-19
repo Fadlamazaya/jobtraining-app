@@ -3,11 +3,13 @@ import { Calendar, Clock, Users, Upload, FileText, User, Building, Save, Send, F
 import { collection, serverTimestamp, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 // HAPUS: import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '../../firebaseConfig'; // TETAPKAN IMPORT db
-
+import { useNavigate } from 'react-router-dom';
 
 // --- KONSTANTA CLOUDINARY (Ganti dengan data Anda) ---
 const CLOUDINARY_CLOUD_NAME = 'dmzybtzsr'; // Ganti dengan Cloud Name Anda
 const CLOUDINARY_UPLOAD_PRESET = 'jt_uploads'; // Ganti dengan Unsigned Preset Anda
+
+// Catatan: Pastikan Cloudinary upload preset 'jt_uploads' adalah *unsigned*.
 
 // --- FUNGSI UTILITAS ---
 const toMinutes = (time) => {
@@ -419,6 +421,8 @@ const RegistrasiPage = () => {
         { nama: 'Plato', kapasitas: 20 }
     ];
 
+    const navigate = useNavigate();
+    
     // --- FETCH DATA (Memuat Jadwal Ter-Approved) ---
     useEffect(() => {
         const fetchManagers = async () => {
