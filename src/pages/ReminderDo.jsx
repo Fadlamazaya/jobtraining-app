@@ -256,7 +256,7 @@ export default function ReminderDo() {
                                             disabled={loading || !isRegistered || !isImplemented}
                                         >
                                             <Send className="w-4 h-4" />
-                                            <span>Kirim Notifikasi</span>
+                                            <span>Kirim notif</span>
                                         </button>
                                     );
 
