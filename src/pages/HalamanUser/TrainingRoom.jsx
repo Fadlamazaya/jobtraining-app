@@ -345,7 +345,7 @@ const TrainingRoom = () => {
                                 <th className="px-4 py-3 text-left w-1/4">Nama Ruangan</th>
                                 <th className="px-4 py-3 text-center w-1/5">Kapasitas</th>
                                 <th className="px-4 py-3 text-center w-1/5">Status Hari Ini</th>
-                                <th className="px-4 py-3 text-center w-1/5">Lihat Jadwal Penuh</th>
+                                <th className="px-4 py-3 text-center w-1/5">Lihat Jadwal Kelas</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
