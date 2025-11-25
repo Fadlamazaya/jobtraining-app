@@ -114,7 +114,7 @@ const Sidebar = () => {
                 "Water Treatment Plant",
                 "Environment Protection Plant",
                 "Raw Material Plant",
-                "Maintenance Plant",
+                // "Maintenance Plant",
               ].map((sub) => {
                 const slug = sub.replace(/\s+/g, ""); // hapus semua spasi
 

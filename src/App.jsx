@@ -1,18 +1,18 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
-import Dashbaord from "./pages/Dashbaord";
-import Reminder from "./pages/reminder";
-import Kompetensi from "./pages/Kompetensi";
-import ReminderFo from "./pages/ReminderFo";
-import ReminderDo from "./pages/ReminderDo";
-import ReminderSL from "./pages/ReminderSL";
-import ReminderManager from "./pages/ReminderManager";
-import EnergiPower from "./pages/EnergiPower";
-import WaterTreatment from "./pages/WaterTreatment";
-import Environment from "./pages/Environment";
-import RawMaterial from "./pages/RawMaterial";
-import Maintenance from "./pages/Maintenance";
+import Dashbaord from "./pages/HalamanNotifikasi/Dashbaord";
+import Reminder from "./pages/HalamanNotifikasi/Reminder";
+import Kompetensi from "./pages/HalamanNotifikasi/Kompetensi";
+import ReminderFo from "./pages/HalamanNotifikasi/ReminderFo";
+import ReminderDo from "./pages/HalamanNotifikasi/ReminderDo";
+import ReminderSL from "./pages/HalamanNotifikasi/ReminderSL";
+import ReminderManager from "./pages/HalamanNotifikasi/ReminderManager";
+import EnergiPower from "./pages/HalamanNotifikasi/EnergiPower";
+import WaterTreatment from "./pages/HalamanNotifikasi/WaterTreatment";
+import Environment from "./pages/HalamanNotifikasi/Environment";
+import RawMaterial from "./pages/HalamanNotifikasi/RawMaterial";
+// import Maintenance from "./pages/Maintenance";
 import UserLayout from "./components/HalamanUser/UserLayout";
 import LoginPage from "./pages/HalamanAdmintr/LoginPage";
 import HomePage from "./pages/HalamanAdmintr/HomePage";
@@ -44,7 +44,7 @@ function App() {
         <Route path="Kompetensi/WaterTreatmentPlant" element={<WaterTreatment />} />
         <Route path="Kompetensi/EnvironmentProtectionPlant" element={<Environment />} />
         <Route path="Kompetensi/RawMaterialPlant" element={<RawMaterial />} />
-        <Route path="Kompetensi/MaintenancePlant" element={<Maintenance />} />
+        {/* <Route path="Kompetensi/MaintenancePlant" element={<Maintenance />} /> */}
       </Route>
 
       {/* Halaman login tanpa layout */}

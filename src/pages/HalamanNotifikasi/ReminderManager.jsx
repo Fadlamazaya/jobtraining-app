@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import emailjs from '@emailjs/browser';
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { db } from "../../firebaseConfig";
 import { Send, AlertTriangle, RefreshCw } from 'lucide-react'; // Import RefreshCw
 
 // --- PENTING: Ganti dengan Kunci EmailJS Anda ---
@@ -10,7 +10,7 @@ const TEMPLATE_ID = "template_6opl2ns";
 const PUBLIC_KEY = "RUUhsfnE0UKyiQ6TP";
 // ----------------------------------------------------
 
-const TARGET_POSITION = "SL";
+const TARGET_POSITION = "Manager";
 
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
