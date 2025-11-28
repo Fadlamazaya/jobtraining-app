@@ -62,22 +62,32 @@ const Sidebar = () => {
 
           {/* Submenu Reminder */}
           <div
-            className={`transition-all duration-300 ease-in-out overflow-hidden ${isReminderOpen ? "max-h-40 mt-1" : "max-h-0"
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${isReminderOpen ? "max-h-60 mt-1" : "max-h-0"
               }`}
           >
             <div className="pl-5 space-y-1">
-              {["FO", "DO", "SL/SPV", "Manager"].map((sub) => (
-                <NavLink
-                  key={sub}
-                  to={`/Reminder/${sub.replace("", "")}`}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${isActive(`/Reminder/${sub.replace("", "")}`)
-                      ? "bg-blue-600 !text-white shadow-md"
-                      : "!text-gray-600 hover:bg-blue-100 hover:!text-blue-800"
-                    }`}
-                >
-                  <BsDot size={20} /> {sub}
-                </NavLink>
-              ))}
+              {[
+                "Energi Power Plant",
+                "Water Treatment Plant",
+                "Environment Protection Plant",
+                "Raw Material Plant",
+                // "Maintenance Plant",
+              ].map((sub) => {
+                const slug = sub.replace(/\s+/g, ""); // hapus semua spasi
+
+                return (
+                  <NavLink
+                    key={slug}
+                    to={`/Reminder/${slug}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${isActive(`/Reminder/${slug}`)
+                        ? "bg-blue-600 !text-white shadow-md"
+                        : "!text-gray-600 hover:bg-blue-100 hover:!text-blue-800"
+                      }`}
+                  >
+                    <BsDot size={20} /> {sub}
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         </div>

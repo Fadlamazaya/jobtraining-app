@@ -4,10 +4,10 @@ import MainLayout from "./layouts/MainLayout";
 import Dashbaord from "./pages/HalamanNotifikasi/Dashbaord";
 import Reminder from "./pages/HalamanNotifikasi/Reminder";
 import Kompetensi from "./pages/HalamanNotifikasi/Kompetensi";
-import ReminderFo from "./pages/HalamanNotifikasi/ReminderFo";
-import ReminderDo from "./pages/HalamanNotifikasi/ReminderDo";
-import ReminderSL from "./pages/HalamanNotifikasi/ReminderSL";
-import ReminderManager from "./pages/HalamanNotifikasi/ReminderManager";
+import ReminderEnergi from "./pages/HalamanNotifikasi/ReminderEnergi";
+import ReminderWater from "./pages/HalamanNotifikasi/ReminderWater";
+import ReminderEnvironment from "./pages/HalamanNotifikasi/ReminderEnvironment";
+import ReminderRawMaterial from "./pages/HalamanNotifikasi/ReminderRawMaterial";
 import EnergiPower from "./pages/HalamanNotifikasi/EnergiPower";
 import WaterTreatment from "./pages/HalamanNotifikasi/WaterTreatment";
 import Environment from "./pages/HalamanNotifikasi/Environment";
@@ -26,6 +26,10 @@ import HRLayout from "./components/HalamanHR/HrLayout";
 import TrainingRecords from "./pages/HalamanUser/trainingRecords";
 import FormEvaluation from "./pages/HalamanUser/FormEvaluation";
 import AssesmentPage from "./pages/HalamanAdmintr/AssesmentPage";
+import EmployeeEnergi from "./pages/HalamanUser/EmployeeEnergi";
+import EmployeeWater from "./pages/HalamanUser/EmployeeWater";
+import EmployeeEnvironment from "./pages/HalamanUser/EmployeeEnvironment";
+import EmployeeRawMaterial from "./pages/HalamanUser/EmployeeRawMaterial.jsx";
 
 
 function App() {
@@ -36,10 +40,10 @@ function App() {
         <Route path="Dashboard" element={<Dashbaord />} />
         <Route path="Reminder" element={<Reminder />} />
         <Route path="Kompetensi" element={<Kompetensi />} />
-        <Route path="Reminder/FO" element={<ReminderFo />} />
-        <Route path="Reminder/DO" element={<ReminderDo />} />
-        <Route path="Reminder/SL/SPV" element={<ReminderSL />} />
-        <Route path="Reminder/Manager" element={<ReminderManager />} />
+        <Route path="Reminder/EnergiPowerPlant" element={<ReminderEnergi />} />
+        <Route path="Reminder/WaterTreatmentPlant" element={<ReminderWater />} />
+        <Route path="Reminder/EnvironmentProtectionPlant" element={<ReminderEnvironment />} />
+        <Route path="Reminder/RawMaterialPlant" element={<ReminderRawMaterial />} />
         <Route path="Kompetensi/EnergiPowerPlant" element={<EnergiPower />} />
         <Route path="Kompetensi/WaterTreatmentPlant" element={<WaterTreatment />} />
         <Route path="Kompetensi/EnvironmentProtectionPlant" element={<Environment />} />
@@ -59,13 +63,22 @@ function App() {
       </Route>
 
       {/* Semua halaman user dibungkus HRLayout */}
-      <Route element={<HRLayout />}></Route>
-        <Route path="/homepagehr" element={<HomePageHR />} />
-        <Route path="/employee-status" element={<EmployeeStatus />} />
-        <Route path="/training-implementation" element={<TrainingImplementation />} />
-        <Route path="/training-room" element={<TrainingRoom />} />
-        <Route path="/training-records" element={<TrainingRecords />} />
-        <Route path="/attendance" element={<FormEvaluation />} />
+        <Route element={<HRLayout />}>
+          <Route path="/homepagehr" element={<HomePageHR />} />
+    
+      {/* Rute yang sudah ada */}
+          <Route path="/employee-status" element={<EmployeeStatus />} />
+          <Route path="/training-implementation" element={<TrainingImplementation />} />
+          <Route path="/training-room" element={<TrainingRoom />} />
+          <Route path="/training-records" element={<TrainingRecords />} />
+          <Route path="/attendance" element={<FormEvaluation />} />
+
+    {/* 🌟 TAMBAHAN KRITIS UNTUK MENGATASI ERROR "No routes matched" 🌟 */}
+          <Route path="/employee-energi" element={<EmployeeEnergi />} />
+          <Route path="/employee-water" element={<EmployeeWater />} />
+          <Route path="/employee-environment" element={<EmployeeEnvironment />} />
+          <Route path="/employee-raw-material" element={<EmployeeRawMaterial />} />
+          </Route>
 
 
     </Routes>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import emailjs from '@emailjs/browser';
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
-import { Send, AlertTriangle, RefreshCw } from 'lucide-react'; // Import RefreshCw
+import { Send, AlertTriangle, RefreshCw } from 'lucide-react'; 
 
 // --- PENTING: Ganti dengan Kunci EmailJS Anda ---
 const SERVICE_ID = "service_aad7d09";
@@ -10,7 +10,7 @@ const TEMPLATE_ID = "template_6opl2ns";
 const PUBLIC_KEY = "RUUhsfnE0UKyiQ6TP";
 // ----------------------------------------------------
 
-const TARGET_POSITION = "FO";
+const TARGET_AREA = "Power Plant";
 
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -19,6 +19,7 @@ const formatDate = (dateString) => {
 };
 
 const isTrainingUpcomingOrCurrent = (start, end) => {
+    // Fungsi ini menentukan training mana yang akan diambil/difilter (yang belum selesai di masa lalu)
     const startDate = new Date(start);
     const endDate = new Date(end);
     const today = new Date();
@@ -28,7 +29,28 @@ const isTrainingUpcomingOrCurrent = (start, end) => {
     return endDate >= today;
 };
 
-export default function ReminderDo() {
+// --- FUNGSI BARU: CEK JIKA TANGGAL SELESAI SUDAH LEWAT (DONE) ---
+// Status Done hanya berdasarkan tanggal, mengabaikan jam untuk menghindari masalah zona waktu kecil.
+const isTrainingDateDone = (endDateString) => {
+    if (!endDateString) return false;
+    
+    // Konversi tanggal selesai training ke objek Date
+    const endDate = new Date(endDateString);
+    
+    // Dapatkan tanggal hari ini
+    const today = new Date();
+    
+    // Reset jam, menit, detik, milidetik ke 00:00:00 untuk kedua tanggal
+    // Ini memastikan perbandingan dilakukan murni berdasarkan tanggal (hari/bulan/tahun).
+    today.setHours(0, 0, 0, 0); 
+    endDate.setHours(0, 0, 0, 0);
+
+    // Jika tanggal selesai (endDate) lebih kecil dari tanggal hari ini (today), berarti sudah selesai.
+    return endDate < today;
+};
+// -----------------------------------------------------------------
+
+export default function ReminderEnergi() {
     const [reminders, setReminders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -38,8 +60,7 @@ export default function ReminderDo() {
         setError(null);
 
         try {
-            // 1. Ambil SEMUA training yang telah disetujui ATAU MASIH PENDING
-            // >>> PERUBAHAN UTAMA: TAMBAHKAN "pending" ke array status
+            // 1. Ambil SEMUA training yang relevan (pending, approved, Implemented)
             const trainingQuery = query(
                 collection(db, "trainingapp"),
                 where("status", "in", ["pending", "approved", "Implemented"])
@@ -56,13 +77,13 @@ export default function ReminderDo() {
                     tanggalSelesai: data.tanggalSelesai,
                     jamMulai: data.jamMulai,
                     jamSelesai: data.jamSelesai,
-                    statusTraining: data.status, // Penting: simpan status training di sini
+                    statusTraining: data.status, 
                 }));
             });
 
-            // 2. Ambil Karyawan berdasarkan TARGET_POSITION (TETAP SAMA)
+            // 2. Ambil Karyawan berdasarkan TARGET_AREA
             const usersCollection = collection(db, "users");
-            const userQuery = query(usersCollection, where("position", "==", TARGET_POSITION));
+            const userQuery = query(usersCollection, where("areaKerja", "==", TARGET_AREA));
             const userSnapshot = await getDocs(userQuery);
 
             const usersList = userSnapshot.docs.map(doc => ({
@@ -72,19 +93,22 @@ export default function ReminderDo() {
 
             // 3. Gabungkan Data Karyawan & Data Training
             const correlatedReminders = usersList.map(user => {
-                // Filter training yang akan/sedang dijalani user DAN statusnya bukan "Implemented" (kalau sudah implemented berarti sudah selesai/tidak perlu diingatkan jadwal lagi)
+                // Filter training yang akan/sedang dijalani user ATAU yang sudah selesai (agar status Done bisa muncul)
                 const userTrainings = allRelevantTrainings.filter(training =>
-                    training.nik === user.nik &&
-                    isTrainingUpcomingOrCurrent(training.tanggalMulai, training.tanggalSelesai)
-                    // training.statusTraining !== 'Implemented' // Hanya ingatkan yang pending/approved
+                    training.nik === user.nik
                 );
+                
+                // Ambil training yang paling relevan (kita ambil training terakhir)
+                const currentTraining = userTrainings.length > 0 
+                    ? userTrainings.sort((a, b) => new Date(b.tanggalMulai) - new Date(a.tanggalMulai))[0]
+                    : null;
 
-                const isRegistered = userTrainings.length > 0;
+                const isRegistered = !!currentTraining;
 
                 return {
                     ...user,
                     isRegistered: isRegistered,
-                    trainings: userTrainings // Daftar training yang akan/sedang berjalan
+                    trainings: currentTraining ? [currentTraining] : [] // Hanya tampilkan 1 training terbaru
                 };
             });
 
@@ -103,13 +127,21 @@ export default function ReminderDo() {
     }, [fetchData]);
 
     const handleSendEmail = useCallback(async (type, data) => {
-        const { name, email, nik, areaKerja, trainings = [] } = data;
+        const { name, email, nik, position, trainings = [] } = data;
         let subject, message, buttonText;
+
+        const firstTraining = trainings[0];
+        const isDateDone = firstTraining ? isTrainingDateDone(firstTraining.tanggalSelesai) : false;
+
+        // Cek jika statusnya Done (tidak bisa kirim notifikasi/alert jika sudah selesai)
+        if (isDateDone) {
+            window.alert(`⚠️ Peringatan: Training ${firstTraining.judulTraining} untuk ${name} sudah selesai (Done). Tidak dapat mengirim email.`);
+            return;
+        }
 
         // Logika untuk Notifikasi Jadwal (Jika Terdaftar)
         if (type === 'notifikasi' && trainings.length > 0) {
-            const firstTraining = trainings[0];
-
+            
             // hanya izinkan notifikasi jika status sudah implemented
             if (firstTraining.statusTraining === 'pending') {
                 window.alert(`⚠️ Peringatan: Jadwal training ${firstTraining.judulTraining} untuk ${name} masih berstatus PENDING. Tidak dapat mengirim notifikasi jadwal.`);
@@ -140,7 +172,7 @@ export default function ReminderDo() {
         }
 
         const templateParams = {
-            title: subject, name: name, email: email, nik: nik, area: areaKerja, message: message,
+            title: subject, name: name, email: email, nik: nik, posisi: position, message: message,
         };
 
         try {
@@ -152,7 +184,9 @@ export default function ReminderDo() {
         }
     }, []);
 
-    // ... (Rendering JSX) ...
+    // ---------------------------------------------------------
+    // RENDER START
+    // ---------------------------------------------------------
 
     if (loading) {
         return <div className="p-6 text-center text-gray-500">Memuat data dan mengkorelasikan jadwal...</div>;
@@ -177,7 +211,7 @@ export default function ReminderDo() {
                     </button>
                 </div>
 
-                <p className="mb-6 font-medium text-gray-600">Daftar Karyawan Posisi: <span className="text-blue-500 font-bold">{TARGET_POSITION}</span></p>
+                <p className="mb-6 font-medium text-gray-600">Daftar Karyawan : <span className="text-blue-500 font-bold">{TARGET_AREA}</span></p>
 
                 <div className="overflow-x-auto rounded-lg shadow-inner">
                     <table className="min-w-full text-sm">
@@ -185,7 +219,7 @@ export default function ReminderDo() {
                             <tr className="uppercase text-xs tracking-wider">
                                 <th className="px-4 py-3 text-left">Nama</th>
                                 <th className="px-4 py-3 text-left">NIK</th>
-                                <th className="px-4 py-3 text-left">Area Kerja</th>
+                                <th className="px-4 py-3 text-left">Position</th>
                                 <th className="px-4 py-3 text-left">Email</th>
                                 <th className="px-4 py-3 text-center w-1/4">Detail Jadwal Training</th>
                                 <th className="px-4 py-3 text-center">Status</th>
@@ -194,12 +228,15 @@ export default function ReminderDo() {
                         </thead>
                         <tbody>
                             {reminders.length > 0 ? (
-                                // BAGIAN INI MENGGANTIKAN SEMUA KODE DI DALAM reminders.map
                                 reminders.map((reminder) => {
                                     const isRegistered = reminder.isRegistered;
                                     const firstTraining = reminder.trainings[0] || {};
 
-                                    // 1. Tentukan status dari training yang bersangkutan
+                                    // --- PENENTUAN STATUS DONE BERDASARKAN TANGGAL ---
+                                    const isDateDone = isRegistered && isTrainingDateDone(firstTraining.tanggalSelesai);
+                                    // --------------------------------------------------
+
+                                    // 1. Tentukan status dari training yang bersangkutan di DB
                                     const currentStatusDb = firstTraining.statusTraining;
 
                                     // 2. Logika Penentuan Status & Warna
@@ -211,12 +248,16 @@ export default function ReminderDo() {
                                     let statusColor = 'bg-red-500 text-white';
 
                                     if (isRegistered) {
-                                        if (isImplemented) {
+                                        if (isDateDone) {
+                                            // PRIORITAS TERTINGGI: Sudah Lewat Tanggal Selesai
+                                            statusLabel = 'Done (Selesai)';
+                                            statusColor = 'bg-gray-700 text-white'; 
+                                        } else if (isImplemented) {
                                             statusLabel = 'Implemented/Final';
-                                            statusColor = 'bg-green-600 text-white'; // BISA DIKIRIM NOTIFIKASI
+                                            statusColor = 'bg-green-600 text-white'; 
                                         } else if (isManagerApproved) {
                                             statusLabel = 'Approved Manager';
-                                            statusColor = 'bg-blue-500 text-white'; // Approved Manager, TAPI BELUM BISA KIRIM NOTIFIKASI
+                                            statusColor = 'bg-blue-500 text-white'; 
                                         } else if (isPending) {
                                             statusLabel = 'Pending';
                                             statusColor = 'bg-yellow-500 text-white';
@@ -235,30 +276,35 @@ export default function ReminderDo() {
                                         <span className="font-semibold text-red-700">BELUM ADA JADWAL</span>
                                     );
 
-                                    // Tombol Alert (Tidak Berubah)
+                                    // --- LOGIKA NONAKTIFKAN TOMBOL JIKA DONE ---
+                                    // Tombol harus mati jika loading ATAU jika statusnya Done
+                                    const isDisabled = loading || isDateDone;
+
+                                    // Tombol Alert 
                                     const buttonAlert = (
                                         <button
                                             onClick={() => handleSendEmail('alert', reminder)}
-                                            className={`w-full px-3 py-1 rounded-lg shadow-md transition flex items-center justify-center space-x-2 ${isRegistered ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                                            disabled={loading || isRegistered}
+                                            className={`w-full px-3 py-1 rounded-lg shadow-md transition flex items-center justify-center space-x-2 ${isRegistered || isDisabled ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                                            disabled={isDisabled || isRegistered} 
                                         >
                                             <AlertTriangle className="w-4 h-4" />
                                             <span>Alert</span>
                                         </button>
                                     );
 
-                                    // Tombol Notifikasi (Logika Kritis)
+                                    // Tombol Notifikasi 
                                     const buttonNotifikasi = (
                                         <button
                                             onClick={() => handleSendEmail('notifikasi', reminder)}
-                                            // HANYA AKTIF JIKA SUDAH IMPLEMENTED (Finalisasi HR)
-                                            className={`w-full px-3 py-1 rounded-lg shadow-md transition flex items-center justify-center space-x-2 ${isRegistered && isImplemented ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-400 text-gray-600 cursor-not-allowed'}`}
-                                            disabled={loading || !isRegistered || !isImplemented}
+                                            // Nonaktif jika Done (isDisabled) ATAU belum Implemented
+                                            className={`w-full px-3 py-1 rounded-lg shadow-md transition flex items-center justify-center space-x-2 ${isRegistered && isImplemented && !isDisabled ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-400 text-gray-600 cursor-not-allowed'}`}
+                                            disabled={isDisabled || !isRegistered || !isImplemented}
                                         >
                                             <Send className="w-4 h-4" />
                                             <span>Kirim Notifikasi</span>
                                         </button>
                                     );
+                                    // -------------------------------------------
 
                                     return (
                                         <tr
@@ -267,13 +313,12 @@ export default function ReminderDo() {
                                         >
                                             <td className="px-4 py-3 font-medium text-gray-800">{reminder.name}</td>
                                             <td className="px-4 py-3">{reminder.nik}</td>
-                                            <td className="px-4 py-3">{reminder.areaKerja}</td>
+                                            <td className="px-4 py-3">{reminder.position}</td>
                                             <td className="px-4 py-3 text-blue-600">{reminder.email}</td>
                                             <td className="px-4 py-3 text-center">
                                                 {trainingDetails}
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                {/* Menampilkan status yang sudah diperbarui */}
                                                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColor}`}>
                                                     {statusLabel}
                                                 </span>
@@ -288,7 +333,7 @@ export default function ReminderDo() {
                             ) : (
                                 <tr>
                                     <td colSpan="7" className="px-4 py-6 text-center text-gray-500">
-                                        Tidak ada data karyawan ditemukan untuk posisi {TARGET_POSITION}.
+                                        Tidak ada data karyawan ditemukan untuk unit {TARGET_AREA}.
                                     </td>
                                 </tr>
                             )}
