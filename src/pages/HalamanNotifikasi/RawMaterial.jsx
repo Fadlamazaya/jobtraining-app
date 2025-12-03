@@ -12,6 +12,7 @@ const getNextPosition = (currentPosition) => {
         "SL": "Manager",
         "SL/SPV": "Manager", 
         "Manager": "Manager", 
+        "N/A": "N/A",
     };
     return positionMap[currentPosition] || currentPosition; 
 };
@@ -50,9 +51,10 @@ const CustomModal = ({ isOpen, onClose, title, message, onConfirm, showConfirmBu
 export default function RawMaterial() {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [modal, setModal] = useState({ isOpen: false, data: null, title: '', message: '' }); 
+    // Menggunakan key 'user' untuk konsistensi dengan unit lain
+    const [modal, setModal] = useState({ isOpen: false, user: null, title: '', message: '', showConfirmButton: false }); 
     
-    // 🎯 TARGET AREA DIUBAH KE RAW MATERIAL PLANT
+    // 🎯 AREA KERJA DIUBAH KE RAW MATERIAL PLANT
     const AREA_KERJA = "Raw Material Plant"; 
 
     // 🔥 Ambil data karyawan dari Firestore
@@ -70,32 +72,25 @@ export default function RawMaterial() {
             const employees = snapshot.docs.map((doc, index) => {
                 const docData = doc.data();
                 
-                // Hitung posisi baru secara otomatis untuk ditampilkan di UI
-                const calculatedNextPos = getNextPosition(docData.position);
-
-                // Mengambil nilai nextPosition yang sudah ada di DB
                 const dbNextPosition = docData.nextPosition;
+                const currentPosition = docData.position || 'N/A';
                 
-                let finalNextPosition;
+                let finalNextPosition = '-';
 
-                // Cek apakah nilai dari database valid dan bukan 'T/A'
-                if (dbNextPosition && dbNextPosition !== 'T/A' && dbNextPosition !== '') {
-                    // Gunakan nilai dari DB (jika sudah ditetapkan admin)
+                // LOGIKA: Jika nextPosition di DB valid dan berbeda dari posisi saat ini (berarti sudah ditetapkan)
+                if (dbNextPosition && dbNextPosition !== currentPosition && dbNextPosition !== 'T/A' && dbNextPosition !== '') {
                     finalNextPosition = dbNextPosition;
-                } else {
-                    // Gunakan perhitungan otomatis
-                    finalNextPosition = calculatedNextPos;
                 }
 
                 return {
                     no: index + 1,
                     id: doc.id,
-                    nama: docData.name,
-                    nik: docData.nik,
-                    posisiSekarang: docData.position,
-                    // Tampilkan target promosi dari DB atau hasil perhitungan otomatis.
+                    nama: doc.data().name,
+                    nik: doc.data().nik,
+                    posisiSekarang: currentPosition,
+                    // Tampilkan target promosi dari DB, atau '-' jika belum ada target
                     posisiBaru: finalNextPosition, 
-                    areaKerja: docData.areaKerja,
+                    areaKerja: doc.data().areaKerja,
                 };
             });
 
@@ -116,14 +111,13 @@ export default function RawMaterial() {
 
     // --- FUNGSI UPDATE FIRESTORE YANG SEBENARNYA (HANYA MENGATUR TARGET) ---
     const executeUbahPosisi = async () => {
-        const userToUpdate = modal.data;
+        const userToUpdate = modal.user; // Menggunakan modal.user
         // Hitung target posisi BARU berdasarkan posisi saat ini
         const targetPosition = getNextPosition(userToUpdate.posisiSekarang);
         
-        setModal({ isOpen: false, data: null, title: '', message: '', showConfirmButton: false });
+        setModal(prev => ({ ...prev, isOpen: false }));
 
         if (targetPosition === userToUpdate.posisiSekarang && targetPosition === "Manager") {
-             console.log(`Posisi ${userToUpdate.nama} sudah Manager.`);
              return;
         }
 
@@ -137,7 +131,6 @@ export default function RawMaterial() {
             });
 
             fetchData(); // Refresh data
-
             console.log(`✅ Target promosi ${userToUpdate.nama} ditetapkan ke ${targetPosition}.`);
             
         } catch (error) {
@@ -150,20 +143,35 @@ export default function RawMaterial() {
     const handleUbahPosisi = (user) => {
         const nextPos = getNextPosition(user.posisiSekarang);
         
+        // 1. Cek apakah sudah Manager
         if (nextPos === user.posisiSekarang && nextPos === "Manager") {
              setModal({
                  isOpen: true,
-                 data: user,
+                 user: user, 
                  title: 'Promosi Gagal',
                  message: `Posisi ${user.nama} sudah Manager dan tidak bisa dipromosikan lagi.`,
                  showConfirmButton: false, 
              });
              return;
         }
+        
+        // 2. Cek apakah sudah ada promosi tertunda (posisiBaru tidak strip '-')
+        if (user.posisiBaru !== '-') {
+            setModal({
+                isOpen: true,
+                user: user, 
+                title: 'Target Sudah Ditetapkan',
+                message: `Target promosi ${user.nama} sudah ditetapkan ke ${user.posisiBaru}. Anda dapat mengubahnya.`,
+                showConfirmButton: false, 
+            });
+            return;
+        }
 
+
+        // 3. Jika belum ditetapkan dan bukan Manager, tampilkan konfirmasi penetapan
         setModal({
             isOpen: true,
-            data: user,
+            user: user,
             title: 'Konfirmasi Penetapan Posisi',
             message: `Yakin ingin menetapkan target promosi ${user.nama} dari ${user.posisiSekarang} menjadi ${nextPos}? Data akan muncul di halaman HR untuk Assessment.`,
             showConfirmButton: true,
@@ -201,7 +209,8 @@ export default function RawMaterial() {
                             {data.map((row) => {
                                 const targetPos = row.posisiBaru; 
                                 const isFinalPosition = row.posisiSekarang === "Manager";
-                                
+                                const isTargetSet = row.posisiBaru !== '-'; // Cek apakah target sudah ditetapkan
+
                                 return (
                                 <tr key={row.id} className="border-b hover:bg-blue-50 transition duration-150">
                                     <td className="border px-3 py-2 text-center">{row.no}</td>
@@ -214,7 +223,9 @@ export default function RawMaterial() {
                                     </td>
                                     {/* Kolom Posisi Baru */}
                                     <td className="border px-3 py-2 text-center">
-                                        <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${isFinalPosition ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-800'}`}>
+                                        <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full 
+                                            ${isFinalPosition ? 'bg-gray-200 text-gray-600' :
+                                                isTargetSet ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}`}>
                                             {targetPos}
                                         </span>
                                     </td>
@@ -222,7 +233,7 @@ export default function RawMaterial() {
                                         <button
                                             onClick={() => handleUbahPosisi(row)}
                                             className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 text-sm flex items-center justify-center space-x-1 mx-auto disabled:opacity-50"
-                                            disabled={isFinalPosition}
+                                            disabled={isFinalPosition || isTargetSet} // Disabled jika sudah Manager ATAU target sudah ditetapkan
                                         >
                                             <Edit className="w-4 h-4" />
                                             <span>Ubah Posisi</span>
@@ -239,7 +250,7 @@ export default function RawMaterial() {
             {modal.isOpen && (
                 <CustomModal
                     isOpen={modal.isOpen}
-                    onClose={() => setModal({ isOpen: false, data: null, title: '', message: '', showConfirmButton: false })}
+                    onClose={() => setModal(prev => ({ ...prev, isOpen: false, showConfirmButton: false }))}
                     title={modal.title}
                     message={modal.message}
                     onConfirm={executeUbahPosisi}

@@ -10,8 +10,9 @@ const getNextPosition = (currentPosition) => {
         "FO": "DO",
         "DO": "SL/SPV",
         "SL": "Manager",
-        "SL/SPV": "Manager", // Menambah SL/SPV jika data Anda menggunakan format ini
+        "SL/SPV": "Manager", 
         "Manager": "Manager", 
+        "T/A": "T/A", // Tambahkan ini agar tidak crash jika posisi awal T/A
     };
     return positionMap[currentPosition] || currentPosition; 
 };
@@ -50,7 +51,8 @@ const CustomModal = ({ isOpen, onClose, title, message, onConfirm, showConfirmBu
 export default function EnergiPower() {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [modal, setModal] = useState({ isOpen: false, data: null, title: '', message: '' }); 
+    // Menggunakan key 'user' untuk konsistensi, bukan 'data'
+    const [modal, setModal] = useState({ isOpen: false, user: null, title: '', message: '', showConfirmButton: false }); 
     
     const AREA_KERJA = "Power Plant"; 
 
@@ -69,31 +71,24 @@ export default function EnergiPower() {
             const employees = snapshot.docs.map((doc, index) => {
                 const docData = doc.data();
                 
-                // Jika nextPosition sudah ada di DB, gunakan itu. Jika belum, hitung posisi baru secara otomatis untuk tampilan UI.
-                const calculatedNextPos = getNextPosition(docData.position);
-
-                // 🔥 PERBAIKAN LOGIKA KRITIS DI SINI 🔥
                 const dbNextPosition = docData.nextPosition;
+                const currentPosition = docData.position || 'N/A';
                 
-                let finalNextPosition;
+                let finalNextPosition = '-';
 
-                // Cek apakah nilai dari database adalah T/A atau string kosong.
-                if (dbNextPosition && dbNextPosition !== 'T/A' && dbNextPosition !== '') {
-                    // Jika ada nilai valid (misal: DO, SL/SPV), gunakan nilai dari DB (yang sudah ditetapkan admin).
+                // ⭐️ LOGIKA: Jika nextPosition di DB adalah posisi yang berbeda dari posisi saat ini
+                // dan BUKAN 'T/A' atau kosong, maka tampilkan posisi tersebut (karena sudah ditetapkan sebelumnya).
+                if (dbNextPosition && dbNextPosition !== currentPosition && dbNextPosition !== 'T/A') {
                     finalNextPosition = dbNextPosition;
-                } else {
-                    // Jika nilai dari DB adalah T/A, kosong, null, atau undefined, gunakan perhitungan otomatis.
-                    finalNextPosition = calculatedNextPos;
-                }
+                } 
 
                 return {
                     no: index + 1,
                     id: doc.id,
                     nama: doc.data().name,
                     nik: doc.data().nik,
-                    posisiSekarang: doc.data().position,
-                    // ⭐️ Tampilkan target promosi dari DB (docData.nextPosition) atau hitung yang baru (calculatedNextPos).
-                    posisiBaru: finalNextPosition, 
+                    posisiSekarang: currentPosition,
+                    posisiBaru: finalNextPosition, // Menggunakan logika strip/nextPosition dari DB
                     areaKerja: doc.data().areaKerja,
                 };
             });
@@ -115,28 +110,30 @@ export default function EnergiPower() {
 
     // --- FUNGSI UPDATE FIRESTORE YANG SEBENARNYA (HANYA MENGATUR TARGET) ---
     const executeUbahPosisi = async () => {
-        const userToUpdate = modal.data;
-        // Hitung target posisi BARU berdasarkan posisi saat ini
+        const userToUpdate = modal.user;
+        
+        // Hitung target posisi BARU berdasarkan posisi saat ini (untuk disimpan)
         const targetPosition = getNextPosition(userToUpdate.posisiSekarang);
         
-        setModal({ isOpen: false, data: null, title: '', message: '' });
+        setModal(prev => ({ ...prev, isOpen: false })); // Tutup modal dulu
 
         if (targetPosition === userToUpdate.posisiSekarang && targetPosition === "Manager") {
-             console.log(`Posisi ${userToUpdate.nama} sudah Manager.`);
+             // Opsional: Tampilkan modal feedback bahwa sudah Manager
              return;
         }
 
         try {
             const userDocRef = doc(db, "users", userToUpdate.id);
             
-            // ⭐️ PERUBAHAN: HANYA UPDATE nextPosition
+            // ⭐️ PERUBAHAN: HANYA UPDATE nextPosition di Firestore
             await updateDoc(userDocRef, {
-                nextPosition: targetPosition, // Menetapkan target promosi untuk HR
-                isAssessmentReady: true // Memberi sinyal ke halaman HR
+                nextPosition: targetPosition, // Menetapkan target promosi
+                isAssessmentReady: true 
             });
 
-            fetchData(); // Refresh data
-
+            // Setelah sukses, refresh data. fetchData akan menampilkan targetPosition baru di UI.
+            fetchData(); 
+            
             console.log(`✅ Target promosi ${userToUpdate.nama} ditetapkan ke ${targetPosition}.`);
             
         } catch (error) {
@@ -149,10 +146,11 @@ export default function EnergiPower() {
     const handleUbahPosisi = (user) => {
         const nextPos = getNextPosition(user.posisiSekarang);
         
+        // 1. Cek apakah sudah Manager
         if (nextPos === user.posisiSekarang && nextPos === "Manager") {
              setModal({
                  isOpen: true,
-                 data: user,
+                 user: user,
                  title: 'Promosi Gagal',
                  message: `Posisi ${user.nama} sudah Manager dan tidak bisa dipromosikan lagi.`,
                  showConfirmButton: false, 
@@ -160,9 +158,23 @@ export default function EnergiPower() {
              return;
         }
 
+        // 2. Cek apakah sudah ada promosi tertunda (nextPosition tidak strip)
+        if (user.posisiBaru !== '-') {
+            setModal({
+                isOpen: true,
+                user: user,
+                title: 'Target Sudah Ditetapkan',
+                message: `Target promosi ${user.nama} sudah ditetapkan ke ${user.posisiBaru}. Anda dapat mengubahnya.`,
+                showConfirmButton: false, 
+            });
+            return;
+        }
+
+
+        // 3. Jika belum ditetapkan dan bukan Manager, tampilkan konfirmasi penetapan
         setModal({
             isOpen: true,
-            data: user,
+            user: user,
             title: 'Konfirmasi Penetapan Posisi',
             message: `Yakin ingin menetapkan target promosi ${user.nama} dari ${user.posisiSekarang} menjadi ${nextPos}? Data akan muncul di halaman HR untuk Assessment.`,
             showConfirmButton: true,
@@ -198,10 +210,9 @@ export default function EnergiPower() {
                         </thead>
                         <tbody>
                             {data.map((row) => {
-                                // Tampilkan target posisi (sudah dihitung di fetchData atau diambil dari DB)
-                                const targetPos = row.posisiBaru; 
                                 const isFinalPosition = row.posisiSekarang === "Manager";
-                                
+                                const isTargetSet = row.posisiBaru !== '-';
+
                                 return (
                                 <tr key={row.id} className="border-b hover:bg-blue-50 transition duration-150">
                                     <td className="border px-3 py-2 text-center">{row.no}</td>
@@ -214,8 +225,10 @@ export default function EnergiPower() {
                                     </td>
                                     {/* Kolom Posisi Baru */}
                                     <td className="border px-3 py-2 text-center">
-                                        <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${isFinalPosition ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-800'}`}>
-                                            {targetPos}
+                                        <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full 
+                                            ${isFinalPosition ? 'bg-gray-200 text-gray-600' : 
+                                              isTargetSet ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}`}>
+                                            {row.posisiBaru}
                                         </span>
                                     </td>
                                     <td className="border px-3 py-2 text-center">
@@ -239,7 +252,7 @@ export default function EnergiPower() {
             {modal.isOpen && (
                 <CustomModal
                     isOpen={modal.isOpen}
-                    onClose={() => setModal({ isOpen: false, data: null, title: '', message: '' })}
+                    onClose={() => setModal(prev => ({ ...prev, isOpen: false, showConfirmButton: false }))}
                     title={modal.title}
                     message={modal.message}
                     onConfirm={executeUbahPosisi}
