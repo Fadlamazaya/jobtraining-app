@@ -1,29 +1,31 @@
 // src/pages/hr/TrainingImplementation.jsx (Kode Final dengan Logika Persetujuan HR)
-import React, { useState, useEffect, useRef } from "react"; 
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig'; 
-import AttendancePDF from "./AttendancePDF"; 
+import React, { useState, useEffect, useRef } from "react";
+import { collection, query, where, getDocs, updateDoc, doc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
+import AttendancePDF from "./AttendancePDF";
 import HRHeader from "../../components/HalamanHR/HRHeader";
 import { Download, CheckCircle, FileText, Clock, Calendar, Users, AlertCircle, XCircle, User, Upload, Building, RefreshCw } from 'lucide-react';
 
+const NOTIFICATIONS_COLLECTION = 'notifications';
+
 const TrainingImplementation = () => {
-    const [registrations, setRegistrations] = useState([]); 
+    const [registrations, setRegistrations] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [selectedReg, setSelectedReg] = useState(null); 
+    const [selectedReg, setSelectedReg] = useState(null);
 
     // Perubahan nama state agar tidak bentrok dengan field dokumen (misalnya: hrComment)
-    const [hrComment, setHrComment] = useState(''); 
-    const fileInputRef = useRef(null); 
-    
+    const [hrComment, setHrComment] = useState('');
+    const fileInputRef = useRef(null);
+
     // Helper untuk memformat tanggal YYYY-MM-DD
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         try {
             const date = new Date(dateString);
             const parts = dateString.split('-');
-            const newDate = new Date(parts[0], parts[1] - 1, parts[2]); 
-            if (isNaN(newDate)) return dateString; 
+            const newDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            if (isNaN(newDate)) return dateString;
             return newDate.toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' });
         } catch (e) {
             return dateString;
@@ -35,20 +37,20 @@ const TrainingImplementation = () => {
         setSelectedReg(null);
         setError(null);
         try {
-            const collectionRef = collection(db, 'trainingapp'); 
-            
+            const collectionRef = collection(db, 'trainingapp');
+
             // 💡 FILTER KRITIS: Hanya ambil data yang sudah di-APPROVED oleh Manager (status === 'approved')
             // Kita juga ambil status final agar bisa ditampilkan: 'Implemented' dan 'HR Rejected'
             const q = query(collectionRef, where('status', 'in', ['approved', 'Implemented', 'HR Rejected']));
-            
+
             const snapshot = await getDocs(q);
-            
+
             const data = snapshot.docs.map(doc => {
                 const docData = doc.data();
-                
+
                 const managerApprovalName = docData.approvalManager || 'User Pendaftar';
                 const emailPrefix = managerApprovalName.split(' ')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
-                
+
                 // Menganalisis status: 'approved' adalah menunggu HR (Implementation)
                 let displayStatus = docData.status;
                 if (docData.status === 'approved') {
@@ -58,39 +60,39 @@ const TrainingImplementation = () => {
                 } else if (docData.status === 'HR Rejected') {
                     displayStatus = 'Ditolak Final (HR)';
                 }
-                
-                return { 
-                    id: doc.id, 
+
+                return {
+                    id: doc.id,
                     ...docData,
-                    noReg: docData.noReg || 'N/A', 
+                    noReg: docData.noReg || 'N/A',
                     area: docData.area || 'N/A',
                     tanggalMulai: docData.tanggalMulai || 'N/A',
                     jamMulai: docData.jamMulai || 'N/A',
                     jamSelesai: docData.jamSelesai || 'N/A',
-                    
-                    pengajuName: managerApprovalName, 
-                    pengajuEmail: `${emailPrefix}.${docData.noReg?.slice(-4) || '0000'}@company.com`, 
+
+                    pengajuName: managerApprovalName,
+                    pengajuEmail: `${emailPrefix}.${docData.noReg?.slice(-4) || '0000'}@company.com`,
                     unitPendaftar: docData.area || 'N/A',
-                    
+
                     // Field status dari DB yang sudah diolah
-                    status: displayStatus, 
+                    status: displayStatus,
                     commentManager: docData.reviewNote, // Komentar dari Manager
                     hrComment: docData.hrComment, // Komentar dari HR (jika ada)
                 };
             });
-            
+
             // Sort: Siap Implementasi di atas
             const sortedData = data.sort((a, b) => {
                 if (a.status === 'Siap Implementasi (Manager Approved)' && b.status !== 'Siap Implementasi (Manager Approved)') return -1;
                 if (a.status !== 'Siap Implementasi (Manager Approved)' && b.status === 'Siap Implementasi (Manager Approved)') return 1;
-                
+
                 const dateA = a.tanggalMulai !== 'N/A' ? new Date(a.tanggalMulai) : 0;
                 const dateB = b.tanggalMulai !== 'N/A' ? new Date(b.tanggalMulai) : 0;
-                return dateB - dateA; 
+                return dateB - dateA;
             });
 
             setRegistrations(sortedData);
-            
+
         } catch (err) {
             console.error("Error fetching requests:", err);
             setError("Gagal memuat data registrasi. Cek konsol browser.");
@@ -108,7 +110,7 @@ const TrainingImplementation = () => {
         // Hanya izinkan aksi jika status saat ini adalah 'Siap Implementasi (Manager Approved)'
         const reg = registrations.find(r => r.id === id);
         if (!reg || reg.status !== 'Siap Implementasi (Manager Approved)') return;
-        
+
         const statusKey = finalStatus === 'Implemented' ? 'Implemented' : 'HR Rejected';
 
         if (finalStatus === 'Implemented' && !window.confirm("Konfirmasi Implementasi: Anda yakin semua persiapan training telah Selesai?")) return;
@@ -116,17 +118,34 @@ const TrainingImplementation = () => {
 
         try {
             const docRef = doc(db, 'trainingapp', id);
-            
+
             await updateDoc(docRef, {
-                status: statusKey, 
+                status: statusKey,
                 hrComment: hrComment, // Menggunakan state hrComment yang baru
-                finalizedAt: new Date().toISOString(), 
+                finalizedAt: new Date().toISOString(),
             });
-            
+
+            // LANGKAH 2: BUAT/UPDATE NOTIFIKASI KHUSUS HR REJECTED
+            if (statusKey === 'HR Rejected') {
+                const notificationDocRef = doc(db, NOTIFICATIONS_COLLECTION, id);
+                await setDoc(notificationDocRef, {
+                    noReg: id,
+                    type: 'HR Finalisasi', // Tipe baru untuk KonfirmasiPage
+                    read: false,
+                    createdAt: new Date(),
+                    payload: {
+                        judul: reg.judulTraining,
+                        area: reg.area,
+                        statusKonfirmasi: 'HR Rejected', // Status yang akan dilihat oleh KonfirmasiPage
+                        komentarHR: hrComment,
+                    }
+                });
+            }
+
             alert(`Status registrasi ${reg.judulTraining} berhasil diubah menjadi ${statusKey}.`);
-            setSelectedReg(null); 
-            setHrComment(''); // Bersihkan state hrComment
-            fetchRequests(); 
+            setSelectedReg(null);
+            setHrComment('');
+            fetchRequests();
         } catch (err) {
             console.error("Error updating status:", err);
             alert('Gagal mengubah status. Cek koneksi Anda.');
@@ -140,7 +159,7 @@ const TrainingImplementation = () => {
 
         const { classes, icon: StatusIcon } = getStatusStyle(reg.status);
         const isActive = selectedReg && selectedReg.id === reg.id;
-        
+
         const cardClasses = `p-4 border-l-4 rounded-lg shadow-md mb-3 cursor-pointer transition 
                              ${isPendingHR ? 'border-orange-500 bg-white hover:shadow-lg' : isFinalized ? 'border-green-700 bg-gray-100 hover:bg-gray-200' : 'border-red-500 bg-white'}
                              ${isActive ? 'ring-2 ring-blue-500 border-blue-600 shadow-xl' : ''}`;
@@ -160,14 +179,14 @@ const TrainingImplementation = () => {
                         {reg.status}
                     </div>
                 </div>
-                
+
                 {/* Detail ringkasan */}
                 <div className="mt-3 text-sm text-gray-600 space-y-1">
                     <p className="flex items-center"><Calendar className="w-4 h-4 mr-2" />Tanggal: {formatDate(reg.tanggalMulai)}</p>
                     <p className="flex items-center"><Clock className="w-4 h-4 mr-2" />Waktu: {reg.jamMulai} - {reg.jamSelesai}</p>
                     <p className="flex items-center text-sm font-medium">{reg.judulTraining}</p>
                 </div>
-                
+
                 {isPendingHR && (
                     <button className="mt-3 w-full py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition">
                         Tindak Lanjut & Finalisasi
@@ -180,11 +199,11 @@ const TrainingImplementation = () => {
     // Fungsi untuk menentukan style status (Diperbarui untuk HR Status)
     const getStatusStyle = (status) => {
         switch (status) {
-            case 'Implemented': 
+            case 'Implemented':
             case 'Selesai/Implementasi': return { classes: 'bg-green-100 text-green-700', icon: CheckCircle };
-            case 'HR Rejected': 
+            case 'HR Rejected':
             case 'Ditolak Final (HR)': return { classes: 'bg-red-100 text-red-700', icon: XCircle };
-            case 'approved': 
+            case 'approved':
             case 'Siap Implementasi (Manager Approved)': default: return { classes: 'bg-orange-100 text-orange-700', icon: AlertCircle };
         }
     };
@@ -201,11 +220,11 @@ const TrainingImplementation = () => {
     // --- RENDER UTAMA ---
     return (
         <div className="min-h-screen bg-gray-100 p-6 pt-24 flex justify-center">
-            <HRHeader /> 
+            <HRHeader />
 
             {/* Kontainer Utama Dua Kolom */}
             <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
+
                 {/* 1. KOLOM KIRI: DAFTAR REGISTRASI */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-2xl">
                     <div className="flex justify-between items-center border-b pb-2 mb-4">
@@ -217,17 +236,17 @@ const TrainingImplementation = () => {
                             <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
-                    
+
                     {error && <div className="p-3 bg-red-100 text-red-700 rounded-lg mb-4">{error}</div>}
 
                     {registrations.length === 0 && !isLoading ? (
                         <div className="p-4 text-center text-gray-500 italic">Tidak ada registrasi yang menunggu persetujuan HR/Implementasi.</div>
                     ) : (
                         <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-2">
-                            {isLoading ? <p className="p-4 text-center text-blue-500">Memuat data...</p> : 
-                            registrations.map(reg => (
-                                <RegistrationCard key={reg.id} reg={reg} />
-                            ))}
+                            {isLoading ? <p className="p-4 text-center text-blue-500">Memuat data...</p> :
+                                registrations.map(reg => (
+                                    <RegistrationCard key={reg.id} reg={reg} />
+                                ))}
                         </div>
                     )}
                 </div>
@@ -235,7 +254,7 @@ const TrainingImplementation = () => {
                 {/* 2. KOLOM KANAN: PANEL FINAL APPROVAL/IMPLEMENTASI */}
                 <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-2xl sticky top-24 h-fit">
                     <h2 className="text-xl font-bold text-blue-700 mb-4 border-b pb-2">Panel Implementasi (HR)</h2>
-                    
+
                     {selectedReg ? (
                         <div className="space-y-4">
                             <h3 className="font-semibold text-gray-800 text-lg">Detail Registrasi</h3>
@@ -263,7 +282,7 @@ const TrainingImplementation = () => {
                                             className="w-full p-2 border rounded-lg focus:ring-blue-500"
                                         ></textarea>
                                     </div>
-    
+
                                     <div className="space-y-3 pt-3 border-t">
                                         <button
                                             onClick={() => handleUpdateStatus(selectedReg.id, 'Implemented')}
@@ -293,19 +312,19 @@ const TrainingImplementation = () => {
                                     </p>
                                     {selectedReg.commentManager && <p className="text-xs mt-2 italic">Komen Manager: "{selectedReg.commentManager}"</p>}
                                     {selectedReg.hrComment && <p className="text-sm mt-2 italic border-t pt-2">Komen HR: "{selectedReg.hrComment}"</p>}
-                                    
+
                                     {/* START INTEGRASI ATTENDANCE PDF */}
                                     {selectedReg.status === 'Selesai/Implementasi' && (
                                         <div className="mt-3 pt-3 border-t">
-                                            <AttendancePDF 
-                                                participantsData={selectedReg.participants} 
+                                            <AttendancePDF
+                                                participantsData={selectedReg.participants}
                                                 trainingTitle={selectedReg.judulTraining}
-                                                registrationData={selectedReg} 
+                                                registrationData={selectedReg}
                                             />
                                         </div>
                                     )}
                                     {/* END INTEGRASI ATTENDANCE PDF */}
-                                    
+
                                     <button onClick={() => setSelectedReg(null)} className="mt-3 w-full py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Tutup Review</button>
                                 </div>
                             )}

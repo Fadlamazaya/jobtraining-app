@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, Clock, Users, Upload, FileText, User, Building, Save, Send, FileX, Eye, Info, Plus, Trash2, ArrowLeft, Download } from 'lucide-react';
-import { collection, serverTimestamp, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
-// HAPUS: import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db } from '../../firebaseConfig'; // TETAPKAN IMPORT db
-import { useNavigate } from 'react-router-dom';
+import { collection, serverTimestamp, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { db } from '../../firebaseConfig';
 
-// --- KONSTANTA CLOUDINARY (Ganti dengan data Anda) ---
-const CLOUDINARY_CLOUD_NAME = 'dmzybtzsr'; // Ganti dengan Cloud Name Anda
-const CLOUDINARY_UPLOAD_PRESET = 'jt_uploads'; // Ganti dengan Unsigned Preset Anda
+// --- KONSTANTA CLOUDINARY ---
+const CLOUDINARY_CLOUD_NAME = 'dmzybtzsr';
+const CLOUDINARY_UPLOAD_PRESET = 'jt_uploads';
+const TRAINING_COLLECTION = 'trainingapp';
+const NOTIFICATIONS_COLLECTION = 'notifications';
 
 // Catatan: Pastikan Cloudinary upload preset 'jt_uploads' adalah *unsigned*.
 
@@ -36,6 +37,7 @@ const generateNoReg = () => {
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     return `REG-${year}${month}${date}-${random}`;
 };
+
 
 // --- FUNGSI UPLOAD KE CLOUDINARY ---
 const uploadFileToCloudinary = async (file, noReg) => {
@@ -376,7 +378,12 @@ const ParticipantSearchInput = ({ index, field, value, placeholder, internalInst
 };
 
 const RegistrasiPage = () => {
-    // ... (States remains the same)
+   
+
+    const { noReg: initialNoReg } = useParams();
+    const isEditMode = !!initialNoReg;
+    const [currentNoReg, setCurrentNoReg] = useState(isEditMode ? initialNoReg : generateNoReg());
+
     const [activeTab, setActiveTab] = useState('general');
     const [showPreview, setShowPreview] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -422,20 +429,15 @@ const RegistrasiPage = () => {
     ];
 
     const navigate = useNavigate();
-    
+
     // --- FETCH DATA (Memuat Jadwal Ter-Approved) ---
     useEffect(() => {
-        const fetchManagers = async () => {
+        const fetchAllInitialData = async () => {
             setIsManagerLoading(true);
-            try {
-                const qManager = query(collection(db, 'users'), where('position', '==', 'Manager'));
-                const snapshotManager = await getDocs(qManager);
-                const managers = snapshotManager.docs.map(doc => {
-                    const data = doc.data();
-                    return { name: data.name, nik: data.nik, areaKerja: data.areaKerja, position: data.position };
-                });
-                setManagerList(managers);
+            setIsScheduleLoading(true);
 
+            try {
+                // Fetch Users & Managers
                 const qUsers = query(collection(db, 'users'));
                 const snapshotUsers = await getDocs(qUsers);
                 const users = snapshotUsers.docs.map(doc => {
@@ -443,34 +445,71 @@ const RegistrasiPage = () => {
                     return { name: data.name, nik: data.nik, areaKerja: data.areaKerja, position: data.position };
                 });
                 setInternalInstructors(users.sort((a, b) => a.name.localeCompare(b.name)));
+                setManagerList(users.filter(u => u.position === 'Manager'));
 
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            } finally {
-                setIsManagerLoading(false);
-            }
-        };
-        const fetchApprovedSchedules = async () => {
-            setIsScheduleLoading(true);
-            try {
-                // Mengambil SEMUA jadwal yang statusnya 'approved' untuk cek bentrok
-                const q = query(collection(db, 'trainingapp'), where('status', 'in', ['approved', 'Implemented'])); // Membaca approved dan implemented
-                const snapshot = await getDocs(q);
-                const schedules = snapshot.docs.map(doc => {
+                // Fetch Approved Schedules
+                const qSchedules = query(collection(db, TRAINING_COLLECTION), where('status', 'in', ['approved', 'Implemented']));
+                const snapshotSchedules = await getDocs(qSchedules);
+                const schedules = snapshotSchedules.docs.map(doc => {
                     const data = doc.data();
                     return { room: data.kelasTraining, dateStart: data.tanggalMulai, dateEnd: data.tanggalSelesai, timeStart: data.jamMulai, timeEnd: data.jamSelesai, };
                 });
                 setScheduledRooms(schedules);
+
+                // Fetch Data for Edit Mode
+                if (isEditMode) {
+                    const docRef = doc(db, TRAINING_COLLECTION, initialNoReg);
+                    const docSnap = await getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+
+                        setGeneralInfo(prev => ({
+                            ...prev,
+                            noReg: initialNoReg,
+                            judulTraining: data.judulTraining || '',
+                            area: data.area || '',
+                            kelasTraining: data.kelasTraining || '',
+                            tanggalMulai: data.tanggalMulai || '',
+                            tanggalSelesai: data.tanggalSelesai || '',
+                            jamMulai: data.jamMulai || '',
+                            jamSelesai: data.jamSelesai || '',
+                            instrukturType: data.instrukturType || '',
+                            jumlahInstruktur: data.instrukturDetails?.length || 1,
+                            instrukturDetails: data.instrukturDetails || [{ nama: '', nikInstansi: '' }],
+                            materiURL: data.materiURL || null,
+                            materiFileName: data.materiFileName || null,
+                            approvalManager: data.approvalManager || '',
+                            // Materi diset null agar user harus re-upload jika ingin mengubah
+                            materi: null,
+                        }));
+
+                        setParticipantInfo(prev => ({
+                            ...prev,
+                            participants: data.participants || [],
+                        }));
+                    } else {
+                        alert('Dokumen registrasi tidak ditemukan.');
+                        navigate('/registrasi');
+                    }
+                }
+
             } catch (error) {
-                console.error("Error fetching approved schedules:", error);
+                console.error("Error fetching initial data:", error);
+                alert("Gagal memuat data awal.");
             } finally {
+                setIsManagerLoading(false);
                 setIsScheduleLoading(false);
             }
         };
-        fetchManagers();
-        fetchApprovedSchedules();
-        setGeneralInfo(prev => ({ ...prev, noReg: generateNoReg() }));
-    }, []);
+        fetchAllInitialData();
+
+        // Hanya jika tidak dalam mode edit, generate NoReg baru
+        if (!isEditMode) {
+            setGeneralInfo(prev => ({ ...prev, noReg: generateNoReg() }));
+        }
+
+    }, [isEditMode, initialNoReg, navigate]);
 
     // ... (useEffect for totalHari/totalJam remains the same)
     useEffect(() => {
@@ -507,7 +546,7 @@ const RegistrasiPage = () => {
             if (schedule.room !== roomName) return false;
             const scheduledStart = new Date(schedule.dateStart);
             const scheduledEnd = new Date(schedule.dateEnd);
-            
+
             // 1. Cek tumpang tindih TANGGAL
             const dateOverlap = newStart <= scheduledEnd && newEnd >= scheduledStart;
 
@@ -784,14 +823,16 @@ const RegistrasiPage = () => {
     // --- FUNGSI SUBMIT FINAL (UPDATED) ---
     const handleFinalSubmit = async () => {
         setIsLoading(true);
-        let materiURL = null;
+        let materiURL = generalInfo.materiURL;
+        let materiFileName = generalInfo.materiFileName;
 
         try {
             const { materi, noReg, ...generalInfoToSave } = generalInfo;
 
-            // 💡 LANGKAH 1: UPLOAD FILE KE CLOUDINARY
-            if (materi) {
+            // 1. UPLOAD FILE BARU JIKA ADA PERUBAHAN
+            if (materi && typeof materi !== 'string' && materi instanceof File) {
                 materiURL = await uploadFileToCloudinary(materi, noReg);
+                materiFileName = generalInfo.materi.name;
             }
 
             const registrationData = {
@@ -799,23 +840,42 @@ const RegistrasiPage = () => {
                 noReg: noReg,
                 participants: participantInfo.participants,
                 totalHari: totalHari, totalJam: totalJam,
-                materiFileName: generalInfo.materi ? generalInfo.materi.name : null,
-                materiURL: materiURL, // 💡 URL Unduhan dari Cloudinary
+                materiFileName: materiFileName,
+                materiURL: materiURL,
+                // Status diset 'pending' agar manager review ulang
                 status: 'pending',
                 createdAt: serverTimestamp(),
-
-                // Tambahan data untuk Manager Review
                 namaInstruktur: generalInfo.instrukturDetails?.[0]?.nama || 'N/A',
                 instrukturNikOrInstansi: generalInfo.instrukturDetails?.[0]?.nikInstansi || 'N/A',
-                submittedBy: 'Current User' // Ganti dengan user yang sedang login
+                submittedBy: 'Current User'
             };
 
-            // 💡 LANGKAH 2: Menggunakan setDoc dengan ID dokumen adalah noReg
-            const docRef = doc(db, 'trainingapp', noReg);
-            await setDoc(docRef, registrationData);
+            const docRef = doc(db, TRAINING_COLLECTION, noReg);
 
-            alert(`Registrasi berhasil dikirim! ID Dokumen (No. Registrasi): ${noReg}.`);
-            handleReset();
+            // 2. HAPUS NOTIFIKASI LAMA (Jika Kirim Ulang setelah Reschedule)
+            if (isEditMode) {
+                try {
+                    const notifRef = doc(db, NOTIFICATIONS_COLLECTION, noReg);
+                    await deleteDoc(notifRef);
+                    console.log("Notifikasi Konfirmasi lama dihapus.");
+                } catch (e) {
+                    console.warn("Gagal menghapus notifikasi lama (mungkin tidak ada).", e);
+                }
+            }
+
+            // 3. SET/UPDATE DOKUMEN DI trainingapp
+            await setDoc(docRef, registrationData, { merge: true });
+
+            alert(`Registrasi ${isEditMode ? 'berhasil dikirim ulang' : 'berhasil dikirim'}! ID Dokumen: ${noReg}.`);
+
+            if (isEditMode) {
+                // Jika user sedang dalam mode Edit (setelah Reschedule dari Manager),
+                // kembalikan dia ke halaman KonfirmasiPage (halaman dia melihat tombol Edit)
+                navigate('/approval');
+            } else {
+                // Jika ini adalah registrasi baru, arahkan ke KonfirmasiPage
+                navigate('/home');
+            }
 
         } catch (error) {
             console.error('Error saat menyimpan registrasi: ', error);
@@ -871,8 +931,15 @@ const RegistrasiPage = () => {
                             <p><span className="font-medium text-gray-700">Area/Unit:</span> {generalInfo.area}</p>
                             <p><span className="font-medium text-gray-700">Kelas:</span> {generalInfo.kelasTraining}</p>
                             <p><span className="font-medium text-gray-700">Approval Manager:</span> {generalInfo.approvalManager}</p>
-                            <p className="pt-2 text-xs font-medium text-gray-700">File Materi: {generalInfo.materi ? <span className='text-green-600'>✅ Terupload ({generalInfo.materi.name})</span> : 'Tidak Ada'}</p>
-                        </div>
+                            <p className="pt-2 text-xs font-medium text-gray-700">
+                                File Materi:
+                                {generalInfo.materi && typeof generalInfo.materi !== 'string' ?
+                                    <span className='text-green-600'>✅ File Baru ({generalInfo.materi.name})</span>
+                                    : generalInfo.materiFileName ?
+                                        <span className='text-blue-600'>✅ File Lama ({generalInfo.materiFileName})</span>
+                                        : 'Tidak Ada'
+                                }
+                            </p>                        </div>
 
                         <div className="space-y-3">
                             <h3 className="font-bold text-lg text-blue-600 border-b-2 border-blue-200 pb-1 mb-2">II. Jadwal & Instruktur</h3>
@@ -927,7 +994,7 @@ const RegistrasiPage = () => {
                         </div>
                     </div>
 
-                    <div className="flex justify-center space-x-4">
+                    <div className="flex justify-center space-x-4 mt-8">
                         <button onClick={() => setShowPreview(false)} className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-lg">
                             Kembali Edit
                         </button>
@@ -936,7 +1003,7 @@ const RegistrasiPage = () => {
                             disabled={isLoading}
                             className={`px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-lg flex items-center space-x-2 disabled:opacity-50`}
                         >
-                            {isLoading ? (<><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>Mengirim...</span></>) : (<><Send className="w-5 h-5" /><span>Kirim Registrasi</span></>)}
+                            {isLoading ? (<><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>Mengirim...</span></>) : (<><Send className="w-5 h-5" /><span>{isEditMode ? 'Kirim Ulang Registrasi' : 'Kirim Registrasi'}</span></>)}
                         </button>
                     </div>
                 </div>
@@ -958,8 +1025,8 @@ const RegistrasiPage = () => {
             <div className="container mx-auto p-4 lg:p-6">
                 <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                     <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white p-6 shadow-md">
-                        <h1 className="text-3xl font-bold">Registrasi Training</h1>
-                        <p className="text-blue-100 mt-2">Silakan lengkapi form registrasi training di bawah ini</p>
+                        <h1 className="text-3xl font-bold">{isEditMode ? 'Edit Ulang Registrasi' : 'Registrasi Training'}</h1>
+                        <p className="text-blue-100 mt-2">No. Registrasi: {currentNoReg}</p>
                     </div>
 
                     <div className="flex border-b border-gray-200 bg-gray-50">

@@ -22,6 +22,7 @@ import EnergiPower from "./pages/HalamanNotifikasi/EnergiPower";
 import WaterTreatment from "./pages/HalamanNotifikasi/WaterTreatment";
 import Environment from "./pages/HalamanNotifikasi/Environment";
 import RawMaterial from "./pages/HalamanNotifikasi/RawMaterial";
+import KonfirmasiPage from "./pages/HalamanNotifikasi/KonfirmasiPage.jsx";
 
 import EmployeeStatus from "./pages/HalamanUser/EmployeeStatus";
 import TrainingImplementation from "./pages/HalamanUser/TrainingImplementation";
@@ -39,31 +40,40 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AccessDenied from "./pages/HalamanAdmintr/AccessDenied"; 
 
 function App() {
-    // Role Karyawan biasa + Manager (yang hanya mengakses home/registrasi)
-    const KaryawanRoles = ["Manager", "FO", "DO", "SL"]; 
-    
-    // Semua role yang diizinkan untuk Home & Registrasi
-    const AllAuthenticatedRoles = ["Admin", "HR", ...KaryawanRoles];
+    // Role Karyawan biasa + Manager (yang hanya mengakses home/registrasi)
+    const KaryawanRoles = ["Manager", "FO", "DO", "SL"]; 
+    
+    // Semua role yang diizinkan untuk Home & Registrasi
+    const AllAuthenticatedRoles = ["Admin", "HR", ...KaryawanRoles];
 
 
-    return (
-        <Routes>
-            {/* Rute 1: LOGIN PAGE (PUBLIC) */}
-            <Route path="/" element={<LoginPage />} />
+    return (
+        <Routes>
+            {/* Rute 1: LOGIN PAGE (PUBLIC) */}
+            <Route path="/" element={<LoginPage />} />
 
-            {/* Rute 2: ACCESS DENIED PAGE (PUBLIC, digunakan oleh ProtectedRoute) */}
-            <Route path="/access-denied" element={<AccessDenied />} />
+            {/* Rute 2: ACCESS DENIED PAGE (PUBLIC, digunakan oleh ProtectedRoute) */}
+            <Route path="/access-denied" element={<AccessDenied />} />
 
 
-            {/* ======================= RUTE UNIVERSAL (HOME & REGISTRASI) ======================= */}
-            {/* Kita bungkus di sini untuk memastikan Home dan Registrasi terproteksi bagi semua yang login */}
-            
-            {/* Home Page (Akses untuk semua role yang valid) */}
-            <Route path="home" element={<ProtectedRoute allowedRoles={AllAuthenticatedRoles}><HomePage /></ProtectedRoute>} />
-            
-            {/* Registrasi Page (Akses untuk semua role yang valid) */}
-            <Route path="registrasi" element={<ProtectedRoute allowedRoles={AllAuthenticatedRoles}><RegistrasiPage /></ProtectedRoute>} />
-
+            {/* ========================= MANAGER/KARYAWAN/HR ROUTES (MENGGUNAKAN USERLAYOUT) ========================= */}
+            {/* Kita gunakan semua role yang dapat mengakses Home/Registrasi di sini */}
+            <Route
+                element={
+                    <ProtectedRoute allowedRoles={AllAuthenticatedRoles}> {/* Diubah dari ["Manager"] ke AllAuthenticatedRoles */}
+                        <UserLayout />
+                    </ProtectedRoute>
+                }
+            >
+                {/* Home dan Registrasi sekarang di-wrap oleh UserLayout */}
+                <Route path="home" element={<HomePage />} />
+                <Route path="registrasi" element={<RegistrasiPage />} />
+                
+                {/* Rute khusus Manager */}
+                <Route path="approval" element={<ApprovalPage />} />
+                <Route path="assesment" element={<AssesmentPage />} />
+                <Route path="registration/edit/:noReg" element={<RegistrasiPage />} />
+            </Route>
 
             {/* ========================= ADMIN ROUTES ========================= */}
             {/* Catatan: Karena Admin juga bisa akses 'home' dan 'registrasi', pastikan MainLayout memiliki link ke sana */}
@@ -85,6 +95,7 @@ function App() {
                 <Route path="Kompetensi/WaterTreatmentPlant" element={<WaterTreatment />} />
                 <Route path="Kompetensi/EnvironmentProtectionPlant" element={<Environment />} />
                 <Route path="Kompetensi/RawMaterialPlant" element={<RawMaterial />} />
+                <Route path="KonfirmasiPage" element={<KonfirmasiPage />} />
             </Route>
 
             
@@ -100,6 +111,7 @@ function App() {
                 {/* Home dan Registrasi sudah di atas. Manager hanya menambah rute ini: */}
                 <Route path="approval" element={<ApprovalPage />} />
                 <Route path="assesment" element={<AssesmentPage />} />
+                <Route path="registration/edit/:noReg" element={<RegistrasiPage />} />
             </Route>
 
 

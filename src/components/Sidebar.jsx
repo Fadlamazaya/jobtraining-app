@@ -1,3 +1,4 @@
+import { BiCommentCheck } from "react-icons/bi"; 
 import { BsDot } from "react-icons/bs";
 import { LayoutDashboard, BellRing } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -26,7 +27,7 @@ const Sidebar = () => {
 
       <div className="flex-grow overflow-y-auto pr-2">
         {/* Dashboard */}
-        <div className="mb-6 space-y-2">
+        <div className="mb-2 space-y-2">
           <NavLink
             to="/Dashboard"
             className={`flex items-center gap-4 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive("/Dashboard")
@@ -40,7 +41,7 @@ const Sidebar = () => {
         </div>
 
         {/* Reminder */}
-        <div className="mb-6">
+        <div className="mb-2">
           <button
             onClick={() => setReminderOpen(!isReminderOpen)}
             className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition-all duration-200 ${location.pathname.includes("/Reminder")
@@ -93,7 +94,7 @@ const Sidebar = () => {
         </div>
 
         {/* Kompetensi */}
-        <div className="mb-6">
+        <div className="mb-2">
           <button
             onClick={() => setKompetensiOpen(!isKompetensiOpen)}
             className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition-all duration-200 ${location.pathname.includes("/Kompetensi")
@@ -144,6 +145,19 @@ const Sidebar = () => {
             </div>
 
           </div>
+        </div>
+
+        <div className="mb-6 space-y-2">
+          <NavLink
+            to="/KonfirmasiPage"
+            className={`flex items-center gap-4 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive("/KonfirmasiPage")
+                ? "bg-blue-600 !text-white shadow-md"
+                : "!text-gray-600 hover:bg-blue-100 hover:!text-blue-800"
+              }`}
+          >
+            <BiCommentCheck size={20} className="text-current" />
+            <span className="font-medium text-sm">Konfirmasi</span>
+          </NavLink>
         </div>
       </div>
     </aside>
