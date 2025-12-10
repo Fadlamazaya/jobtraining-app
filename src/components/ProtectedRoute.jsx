@@ -1,0 +1,24 @@
+// src/components/ProtectedRoute.jsx
+
+import { Navigate } from "react-router-dom";
+// GANTI PATH INI:
+// import AccessDenied from "../pages/AccessDenied"; 
+import AccessDenied from "../pages/HalamanAdmintr/AccessDenied"; // <<< PATH YANG BENAR
+
+export default function ProtectedRoute({ children, allowedRoles }) {
+    const userRole = localStorage.getItem("userRole");
+
+    // 1. Tidak login → redirect ke login
+    if (!userRole) {
+        localStorage.removeItem('userName');
+        return <Navigate to="/" replace />;
+    }
+
+    // 2. Kalau role tidak sesuai → blokir akses
+    if (!allowedRoles.includes(userRole)) {
+        return <AccessDenied />; // Merender komponen AccessDenied
+    }
+
+    // 3. Izinkan akses
+    return children;
+}

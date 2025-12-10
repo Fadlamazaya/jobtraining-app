@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, User, Lock, Building2, ArrowRight, Shield, Waves } from 'lucide-react';
 
-import { db } from '../../firebaseConfig'; // pastikan path sesuai
+import { db } from '../../firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,26 +32,26 @@ const LoginPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.noSAP.trim()) {
       newErrors.noSAP = 'NIK wajib diisi';
     } else if (formData.noSAP.length !== 6) {
       newErrors.noSAP = 'NIK harus 6 angka';
     }
-    
+
     if (!formData.password.trim()) {
       newErrors.password = 'Password wajib diisi';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password minimal 6 karakter';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
     setIsLoading(true);
 
@@ -67,10 +67,27 @@ const LoginPage = () => {
 
       if (!querySnapshot.empty) {
         const user = querySnapshot.docs[0].data();
+
+        // Simpan role di localStorage
+        localStorage.setItem("userRole", user.position);
+        localStorage.setItem("userName", user.name);
+
         alert(`Login berhasil! Selamat datang, ${user.name}`);
 
-        // Arahkan ke halaman /home
-        navigate('/home');
+        // Routing berdasarkan role
+        if (["Manager", "FO", "DO", "SL"].includes(user.position)) {
+          navigate("/home");
+        }
+        else if (user.position === "HR") {
+          navigate("/homepagehr");
+        }
+        else if (user.position === "Admin") {
+          navigate("/Dashboard");
+        }
+        else {
+          alert("Role tidak dikenal!");
+        }
+
       } else {
         alert('Login gagal! NIK atau password salah.');
       }
@@ -83,6 +100,7 @@ const LoginPage = () => {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-700 to-blue-500 relative overflow-hidden">
       {/* Background Decorations */}
@@ -90,23 +108,23 @@ const LoginPage = () => {
         {/* Animated waves */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1200 120" className="w-full h-32 text-blue-600 opacity-20">
-            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" 
-                  fill="currentColor" className="animate-pulse">
+            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
+              fill="currentColor" className="animate-pulse">
               <animateTransform
                 attributeName="transform"
                 attributeType="XML"
                 type="translate"
                 values="0 0; 30 0; 0 0"
                 dur="6s"
-                repeatCount="indefinite"/>
+                repeatCount="indefinite" />
             </path>
           </svg>
         </div>
-        
+
         {/* Floating circles */}
         <div className="absolute top-20 left-20 w-64 h-64 bg-white opacity-5 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-48 h-48 bg-blue-300 opacity-10 rounded-full blur-2xl animate-bounce" style={{animationDuration: '3s'}}></div>
-        <div className="absolute bottom-40 left-1/3 w-32 h-32 bg-white opacity-10 rounded-full blur-xl animate-ping" style={{animationDuration: '4s'}}></div>
+        <div className="absolute top-40 right-20 w-48 h-48 bg-blue-300 opacity-10 rounded-full blur-2xl animate-bounce" style={{ animationDuration: '3s' }}></div>
+        <div className="absolute bottom-40 left-1/3 w-32 h-32 bg-white opacity-10 rounded-full blur-xl animate-ping" style={{ animationDuration: '4s' }}></div>
       </div>
 
       {/* Main Content */}
@@ -142,18 +160,16 @@ const LoginPage = () => {
                       name="noSAP"
                       value={formData.noSAP}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-lg ${
-                        errors.noSAP 
-                          ? 'border-red-400 focus:border-red-500' 
+                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-lg ${errors.noSAP
+                          ? 'border-red-400 focus:border-red-500'
                           : 'border-gray-200 focus:border-blue-500 hover:border-blue-300'
-                      }`}
+                        }`}
                       placeholder="Masukkan No. SAP Anda"
                       disabled={isLoading}
                     />
                     <div className="absolute inset-y-0 right-4 flex items-center">
-                      <Shield className={`w-5 h-5 transition-colors ${
-                        formData.noSAP ? 'text-blue-500' : 'text-gray-400'
-                      }`} />
+                      <Shield className={`w-5 h-5 transition-colors ${formData.noSAP ? 'text-blue-500' : 'text-gray-400'
+                        }`} />
                     </div>
                   </div>
                   {errors.noSAP && (
@@ -174,11 +190,10 @@ const LoginPage = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 pr-12 bg-gray-50 border-2 rounded-xl transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-lg ${
-                        errors.password 
-                          ? 'border-red-400 focus:border-red-500' 
+                      className={`w-full px-4 py-3 pr-12 bg-gray-50 border-2 rounded-xl transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-lg ${errors.password
+                          ? 'border-red-400 focus:border-red-500'
                           : 'border-gray-200 focus:border-blue-500 hover:border-blue-300'
-                      }`}
+                        }`}
                       placeholder="Masukkan password Anda"
                       disabled={isLoading}
                     />
@@ -199,8 +214,8 @@ const LoginPage = () => {
                 {/* Remember Me & Forgot Password */}
                 <div className="flex items-center justify-between">
                   <label className="flex items-center space-x-3 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all"
                       disabled={isLoading}
                     />
@@ -238,13 +253,7 @@ const LoginPage = () => {
 
               {/* Footer Links */}
               <div className="mt-6 pt-4 border-t border-gray-200 text-center space-y-3">
-                <p className="text-sm text-gray-600">
-                  Belum memiliki akun? 
-                  <button className="ml-2 text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors">
-                    Daftar sekarang
-                  </button>
-                </p>
-                
+
                 <div className="flex items-center justify-center space-x-4 text-xs text-gray-500">
                   <button className="hover:text-blue-600 transition-colors">Bantuan</button>
                   <span>•</span>
