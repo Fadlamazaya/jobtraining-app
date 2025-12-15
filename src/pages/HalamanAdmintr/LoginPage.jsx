@@ -271,7 +271,7 @@ const LoginPage = () => {
           {/* Bottom Info */}
           <div className="mt-6 text-center">
             <p className="text-white/80 text-sm">
-              © 2024 Training Management System. All rights reserved.
+              © 2024 E-Training System. All rights reserved.
             </p>
             <div className="mt-2 flex items-center justify-center space-x-2 text-white/60">
               <Waves className="w-4 h-4" />
