@@ -6,100 +6,103 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 const LoginPage = () => {
-  const [formData, setFormData] = useState({
-    noSAP: '',
-    password: ''
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState({});
-  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    noSAP: '',
+    password: ''
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const navigate = useNavigate();
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
 
-  const validateForm = () => {
-    const newErrors = {};
+  const validateForm = () => {
+    const newErrors = {};
 
-    if (!formData.noSAP.trim()) {
-      newErrors.noSAP = 'NIK wajib diisi';
-    } else if (formData.noSAP.length !== 6) {
-      newErrors.noSAP = 'NIK harus 6 angka';
-    }
+    if (!formData.noSAP.trim()) {
+      newErrors.noSAP = 'NIK wajib diisi';
+    } else if (formData.noSAP.length !== 6) {
+      newErrors.noSAP = 'NIK harus 6 angka';
+    }
 
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password wajib diisi';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password minimal 6 karakter';
-    }
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password wajib diisi';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password minimal 6 karakter';
+    }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    if (!validateForm()) return;
-    setIsLoading(true);
+    if (!validateForm()) return;
+    setIsLoading(true);
 
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef,
-        where('nik', '==', formData.noSAP),
-        where('password', '==', formData.password)
-      );
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('nik', '==', formData.noSAP),
+        where('password', '==', formData.password)
+      );
 
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        const user = querySnapshot.docs[0].data();
+      if (!querySnapshot.empty) {
+        const user = querySnapshot.docs[0].data();
 
-        // Simpan role di localStorage
-        localStorage.setItem("userRole", user.position);
-        localStorage.setItem("userName", user.name);
+        // --- PERBAIKAN: GUNAKAN sessionStorage ---
+        sessionStorage.setItem("userRole", user.position);
+        sessionStorage.setItem("userName", user.name);
+        sessionStorage.setItem("isLoggedIn", "true"); // <-- Menggunakan sessionStorage
 
-        alert(`Login berhasil! Selamat datang, ${user.name}`);
+        alert(`Login berhasil! Selamat datang, ${user.name}`);
 
-        // Routing berdasarkan role
-        if (["Manager", "FO", "DO", "SL"].includes(user.position)) {
-          navigate("/home");
-        }
-        else if (user.position === "HR") {
-          navigate("/homepagehr");
-        }
-        else if (user.position === "Admin") {
-          navigate("/Dashboard");
-        }
-        else {
-          alert("Role tidak dikenal!");
-        }
+        // Routing berdasarkan role (dengan replace: true)
+        if (user.position === "Admin") {
+          navigate("/Dashboard", { replace: true });
+        }
+        else if (user.position === "HR") {
+          navigate("/homepagehr", { replace: true });
+        }
+        else if (["Manager", "FO", "DO", "SL"].includes(user.position)) {
+          navigate("/home", { replace: true });
+        }
+        else {
+          alert("Role tidak dikenal!");
+          sessionStorage.removeItem("userRole"); // <-- Menggunakan sessionStorage
+          sessionStorage.removeItem("userName"); // <-- Menggunakan sessionStorage
+          sessionStorage.removeItem("isLoggedIn"); // <-- Menggunakan sessionStorage
+        }
+      
+      } else {
+        alert('Login gagal! NIK atau password salah.');
+      }
 
-      } else {
-        alert('Login gagal! NIK atau password salah.');
-      }
-
-    } catch (error) {
-      console.error('Error login:', error);
-      alert('Terjadi kesalahan saat login.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+    } catch (error) {
+      console.error('Error login:', error);
+      alert('Terjadi kesalahan saat login.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-700 to-blue-500 relative overflow-hidden">

@@ -4,7 +4,7 @@ import { Navigate } from "react-router-dom";
 import AccessDenied from "../pages/HalamanAdmintr/AccessDenied"; 
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-    const userRole = localStorage.getItem("userRole");
+    const userRole = sessionStorage.getItem("userRole");
 
     // 1. Tidak login → redirect ke login
     if (!userRole) {

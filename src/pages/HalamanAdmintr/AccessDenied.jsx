@@ -7,18 +7,19 @@ import { useNavigate } from 'react-router-dom';
 const AccessDenied = () => {
     const navigate = useNavigate();
 
-    // Ambil data dari localStorage
-    const userName = localStorage.getItem('userName') || 'Pengguna';
-    const userRole = localStorage.getItem('userRole') || 'Tanpa Role';
+    // Ambil data dari sessionStorage
+    const userName = sessionStorage.getItem('userName') || 'Pengguna';
+    const userRole = sessionStorage.getItem('userRole') || 'Tanpa Role';
 
-    // Fungsi untuk logout dan kembali ke halaman login
-    const handleLogout = () => {
-        // Hapus data autentikasi
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userName');
-        // Arahkan ke halaman login
-        navigate('/', { replace: true });
-    };
+    // Fungsi untuk logout dan kembali ke halaman login
+    const handleLogout = () => {
+        // Hapus data autentikasi dari sessionStorage
+        sessionStorage.removeItem('userRole');
+        sessionStorage.removeItem('userName');
+        sessionStorage.removeItem('isLoggedIn');
+        
+        navigate('/', { replace: true });
+    };
 
     // Opsional: Otomatis logout setelah beberapa detik (misalnya 8 detik)
     useEffect(() => {

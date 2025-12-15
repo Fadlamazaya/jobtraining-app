@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom"; 
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import UserLayout from "./components/HalamanUser/UserLayout";
 import HRLayout from "./components/HalamanHR/HrLayout";
@@ -58,44 +58,43 @@ function App() {
     const navigate = useNavigate();
     // State untuk menandakan apakah pemeriksaan sesi sudah selesai
     const [isSessionChecked, setIsSessionChecked] = useState(false);
-    
+
     // Role Karyawan biasa (FO, DO, SL)
-    const KaryawanBiasaRoles = ["FO", "DO", "SL"]; 
-    
+    const KaryawanBiasaRoles = ["FO", "DO", "SL"];
+
     // Semua role yang diizinkan untuk Home & Registrasi (Akses universal)
     const AllAuthenticatedRoles = ["Manager", "HR", "Admin", ...KaryawanBiasaRoles];
 
-    
+
     // 💡 LOGIKA UTAMA PERSISTENSI SESI SAAT APLIKASI DIMUAT
     useEffect(() => {
         const checkSession = () => {
-            const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-            const role = localStorage.getItem("userRole");
+            const isLoggedIn = sessionStorage.getItem("isLoggedIn") === "true";
+            const role = sessionStorage.getItem("userRole");
             const currentPath = window.location.pathname;
 
             if (isLoggedIn && role) {
-                const targetRoute = getRouteByRole(role);
-                
-                // Jika pengguna berada di halaman login ('/'), arahkan ke home role mereka
-                if (currentPath === '/') {
-                    navigate(targetRoute, { replace: true });
-                }
-                
-                // Jika pengguna ada di AccessDenied, dan role mereka valid, arahkan ke home mereka
-                // Ini mengatasi kasus refresh di AccessDenied
+                // Jika pengguna sudah login, tapi mencoba ke /access-denied, 
+                // arahkan kembali ke dashboard
                 if (currentPath === '/access-denied') {
+                    const targetRoute = getRouteByRole(role);
                     navigate(targetRoute, { replace: true });
                 }
 
+                // HAPUS LOGIKA REDIRECT JIKA currentPath === '/'
+                // Biarkan LoginPage di-render, tapi akan menampilkan "sudah login"
+                // Dan biarkan ProtectedRoute menangani rute terproteksi.
+
             } else if (currentPath !== '/') {
-                // Jika tidak login dan mencoba mengakses rute terproteksi, paksa ke login
-                // Ini penting jika localStorage.isLoggedIn dihapus di halaman non-login
-                navigate('/', { replace: true });
+                // Jika TIDAK login dan mencoba mengakses rute terproteksi, paksa ke login
+                if (currentPath !== '/access-denied') {
+                    navigate('/', { replace: true });
+                }
             }
-            
+
             setIsSessionChecked(true);
         };
-        
+
         checkSession();
     }, [navigate]);
 
@@ -111,7 +110,6 @@ function App() {
             </div>
         );
     }
-    
 
     return (
         <Routes>
@@ -125,43 +123,43 @@ function App() {
             {/* ========================= USER/KARYAWAN ROUTES (DIBUNGKUS USERLAYOUT) ========================= */}
             {/* UserLayout adalah layout default untuk Manager & Karyawan Biasa */}
             <Route element={<UserLayout />}>
-                
+
                 {/* Home Page (Akses untuk Semua Role Valid) */}
-                <Route 
-                    path="home" 
-                    element={<ProtectedRoute allowedRoles={AllAuthenticatedRoles}><HomePage /></ProtectedRoute>} 
+                <Route
+                    path="home"
+                    element={<ProtectedRoute allowedRoles={AllAuthenticatedRoles}><HomePage /></ProtectedRoute>}
                 />
-                
+
                 {/* Registrasi Page (Akses untuk Semua Role Valid) */}
-                <Route 
-                    path="registrasi" 
-                    element={<ProtectedRoute allowedRoles={AllAuthenticatedRoles}><RegistrasiPage /></ProtectedRoute>} 
+                <Route
+                    path="registrasi"
+                    element={<ProtectedRoute allowedRoles={AllAuthenticatedRoles}><RegistrasiPage /></ProtectedRoute>}
                 />
 
                 {/* Rute KHUSUS MANAGER: Approval */}
-                <Route 
-                    path="approval" 
+                <Route
+                    path="approval"
                     // HANYA MANAGER yang diizinkan, role lain akan AccessDenied
-                    element={<ProtectedRoute allowedRoles={["Manager"]}><ApprovalPage /></ProtectedRoute>} 
+                    element={<ProtectedRoute allowedRoles={["Manager"]}><ApprovalPage /></ProtectedRoute>}
                 />
-                
+
                 {/* Rute KHUSUS MANAGER: Assesment */}
-                <Route 
-                    path="assesment" 
+                <Route
+                    path="assesment"
                     // HANYA MANAGER yang diizinkan
-                    element={<ProtectedRoute allowedRoles={["Manager"]}><AssesmentPage /></ProtectedRoute>} 
+                    element={<ProtectedRoute allowedRoles={["Manager"]}><AssesmentPage /></ProtectedRoute>}
                 />
-                
+
                 {/* Rute Edit Registrasi (Asumsi Manager) */}
-                <Route 
-                    path="registration/edit/:noReg" 
-                    element={<ProtectedRoute allowedRoles={["Manager"]}><RegistrasiPage /></ProtectedRoute>} 
+                <Route
+                    path="registration/edit/:noReg"
+                    element={<ProtectedRoute allowedRoles={["Manager"]}><RegistrasiPage /></ProtectedRoute>}
                 />
             </Route>
 
 
             {/* ========================= ADMIN ROUTES (DIBUNGKUS MAINLAYOUT) ========================= */}
-            <Route 
+            <Route
                 element={
                     <ProtectedRoute allowedRoles={["Admin"]}>
                         <MainLayout />
@@ -182,7 +180,7 @@ function App() {
                 <Route path="KonfirmasiPage" element={<KonfirmasiPage />} />
             </Route>
 
-            
+
             {/* ========================= HR ROUTES (DIBUNGKUS HRLAYOUT) ========================= */}
             <Route
                 element={
@@ -204,7 +202,7 @@ function App() {
                 <Route path="/employee-raw-material" element={<EmployeeRawMaterial />} />
             </Route>
 
-        
+
             <Route path="*" element={<Navigate to="/home" replace />} />
 
         </Routes>
