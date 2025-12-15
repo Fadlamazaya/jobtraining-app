@@ -24,16 +24,16 @@ import Environment from "./pages/HalamanNotifikasi/Environment";
 import RawMaterial from "./pages/HalamanNotifikasi/RawMaterial";
 import KonfirmasiPage from "./pages/HalamanNotifikasi/KonfirmasiPage.jsx";
 
-import EmployeeStatus from "./pages/HalamanUser/EmployeeStatus";
-import TrainingImplementation from "./pages/HalamanUser/TrainingImplementation";
-import TrainingRoom from "./pages/HalamanUser/TrainingRoom";
-import HomePageHR from "./pages/HalamanUser/HomePageHR";
-import TrainingRecords from "./pages/HalamanUser/trainingRecords";
-import FormEvaluation from "./pages/HalamanUser/FormEvaluation";
-import EmployeeEnergi from "./pages/HalamanUser/EmployeeEnergi";
-import EmployeeWater from "./pages/HalamanUser/EmployeeWater";
-import EmployeeEnvironment from "./pages/HalamanUser/EmployeeEnvironment";
-import EmployeeRawMaterial from "./pages/HalamanUser/EmployeeEnvironment.jsx";
+import EmployeeStatus from "./pages/HalamanUser/EmployeeStatus.jsx";
+import TrainingImplementation from "./pages/HalamanUser/TrainingImplementation.jsx";
+import TrainingRoom from "./pages/HalamanUser/TrainingRoom.jsx";
+import HomePageHR from "./pages/HalamanUser/HomePageHR.jsx";
+import TrainingRecords from "./pages/HalamanUser/TrainingRecords.jsx";
+import FormEvaluation from "./pages/HalamanUser/FormEvaluation.jsx";
+import EmployeeEnergi from "./pages/HalamanUser/EmployeeEnergi.jsx";
+import EmployeeWater from "./pages/HalamanUser/EmployeeWater.jsx";
+import EmployeeEnvironment from "./pages/HalamanUser/EmployeeEnvironment.jsx";
+import EmployeeRawMaterial from "./pages/HalamanUser/EmployeeRawMaterial.jsx";
 
 // Import Custom Components
 import ProtectedRoute from "./components/ProtectedRoute";
