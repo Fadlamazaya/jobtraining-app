@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import UserLayout from "./components/HalamanUser/UserLayout";
-import HRLayout from "./components/HalamanHR/HrLayout";
+import HRLayout from "./components/HalamanHR/HRLayout.jsx";
 
 // Import Pages
 import LoginPage from "./pages/HalamanAdmintr/LoginPage";
