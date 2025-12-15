@@ -5,23 +5,23 @@ import UserLayout from "./components/HalamanUser/UserLayout.jsx";
 import HRLayout from "./components/HalamanHR/HRLayout.jsx";
 
 // Import Pages
-import LoginPage from "./pages/HalamanAdmintr/LoginPage";
-import HomePage from "./pages/HalamanAdmintr/HomePage";
-import RegistrasiPage from "./pages/HalamanAdmintr/RegistrasiPage";
-import ApprovalPage from "./pages/HalamanAdmintr/ApprovalPage";
-import AssesmentPage from "./pages/HalamanAdmintr/AssesmentPage";
+import LoginPage from "./pages/HalamanAdmintr/LoginPage.jsx";
+import HomePage from "./pages/HalamanAdmintr/HomePage.jsx";
+import RegistrasiPage from "./pages/HalamanAdmintr/RegistrasiPage.jsx";
+import ApprovalPage from "./pages/HalamanAdmintr/ApprovalPage.jsx";
+import AssesmentPage from "./pages/HalamanAdmintr/AssesmentPage.jsx";
 
-import Dashbaord from "./pages/HalamanNotifikasi/Dashbaord";
-import Reminder from "./pages/HalamanNotifikasi/Reminder";
-import Kompetensi from "./pages/HalamanNotifikasi/Kompetensi";
-import ReminderEnergi from "./pages/HalamanNotifikasi/ReminderEnergi";
-import ReminderWater from "./pages/HalamanNotifikasi/ReminderWater";
-import ReminderEnvironment from "./pages/HalamanNotifikasi/ReminderEnvironment";
-import ReminderRawMaterial from "./pages/HalamanNotifikasi/ReminderRawMaterial";
-import EnergiPower from "./pages/HalamanNotifikasi/EnergiPower";
-import WaterTreatment from "./pages/HalamanNotifikasi/WaterTreatment";
-import Environment from "./pages/HalamanNotifikasi/Environment";
-import RawMaterial from "./pages/HalamanNotifikasi/RawMaterial";
+import Dashbaord from "./pages/HalamanNotifikasi/Dashbaord.jsx";
+import Reminder from "./pages/HalamanNotifikasi/Reminder.jsx";
+import Kompetensi from "./pages/HalamanNotifikasi/Kompetensi.jsx";
+import ReminderEnergi from "./pages/HalamanNotifikasi/ReminderEnergi.jsx";
+import ReminderWater from "./pages/HalamanNotifikasi/ReminderWater.jsx";
+import ReminderEnvironment from "./pages/HalamanNotifikasi/ReminderEnvironment.jsx";
+import ReminderRawMaterial from "./pages/HalamanNotifikasi/ReminderRawMaterial.jsx";
+import EnergiPower from "./pages/HalamanNotifikasi/EnergiPower.jsx";
+import WaterTreatment from "./pages/HalamanNotifikasi/WaterTreatment.jsx";
+import Environment from "./pages/HalamanNotifikasi/Environment.jsx";
+import RawMaterial from "./pages/HalamanNotifikasi/RawMaterial.jsx";
 import KonfirmasiPage from "./pages/HalamanNotifikasi/KonfirmasiPage.jsx";
 
 import EmployeeStatus from "./pages/HalamanUser/EmployeeStatus.jsx";
