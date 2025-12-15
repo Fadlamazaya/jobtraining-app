@@ -1,3 +1,4 @@
+// ApprovalPage.jsx (Kode yang Diperbaiki)
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Check, X, Eye, FileText, Clock, CheckCircle, XCircle, Filter, Download, Trash2, Users, Bell, Mail, Send, Calendar } from 'lucide-react';
 import { collection, query, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -66,7 +67,11 @@ export default function ApprovalPage() {
     const statusConfig = {
         pending: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
         approved: { label: 'Disetujui', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-        rejected: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: XCircle }
+        rejected: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: XCircle },
+        // Tambahkan status yang harus dianggap 'Disetujui' oleh Manager
+        Implemented: { label: 'Disetujui', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+        'HR Rejected': { label: 'Disetujui', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+        'reschedule_pending': { label: 'Disetujui', color: 'bg-green-100 text-green-700', icon: CheckCircle },
     };
 
     // ===========================================
@@ -314,6 +319,11 @@ export default function ApprovalPage() {
     };
 
     const getStatusCount = (status) => {
+        // 💡 PERBAIKAN LOGIKA COUNT DI HALAMAN MANAGER
+        if (status === 'approved') {
+            // Hitung 'approved' + status yang seharusnya dianggap 'Disetujui' oleh Manager
+            return approvals.filter(a => ['approved', 'Implemented', 'HR Rejected', 'reschedule_pending'].includes(a.status)).length;
+        }
         return approvals.filter(a => a.status === status).length;
     };
 
@@ -324,11 +334,12 @@ export default function ApprovalPage() {
             approval.judulTraining.toLowerCase().includes(searchTerm.toLowerCase()) ||
             approval.area.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesFilter = filterStatus === 'all' || approval.status === filterStatus;
+        // 💡 PERBAIKAN LOGIKA FILTER DI HALAMAN MANAGER
+        const matchesFilter = filterStatus === 'all' || 
+            (filterStatus === 'approved' && ['approved', 'Implemented', 'HR Rejected', 'reschedule_pending'].includes(approval.status)) ||
+            approval.status === filterStatus;
 
-        const isManagerLevelStatus = ['pending', 'approved', 'rejected'].includes(approval.status);
-
-        return matchesSearch && (filterStatus === 'all' || approval.status === filterStatus);
+        return matchesSearch && matchesFilter;
     });
 
     const unreadNotificationsCount = notifications.filter(n => !n.read).length;
@@ -387,6 +398,7 @@ export default function ApprovalPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-b pb-4 mb-4">
                         <div>
                             <p className="text-sm font-semibold text-gray-600">Status Approval</p>
+                            {/* 💡 MENGGUNAKAN LOGIKA YANG SAMA DENGAN TABEL */}
                             <span className={`inline-flex items-center mt-1 px-3 py-1 rounded-full text-xs font-medium ${statusConfig[reg.status]?.color}`}>
                                 {statusConfig[reg.status]?.label}
                             </span>
@@ -632,7 +644,13 @@ export default function ApprovalPage() {
                                     </tr>
                                 ) : (
                                     filteredApprovals.map((approval) => {
-                                        const StatusIcon = statusConfig[approval.status]?.icon || Clock;
+                                        // 💡 LOGIKA PERBAIKAN: Tampilkan 'Disetujui' jika status DB adalah approved, Implemented, atau HR Rejected.
+                                        const displayStatus = ['approved', 'Implemented', 'HR Rejected', 'reschedule_pending'].includes(approval.status)
+                                            ? 'approved' // Tampilkan sebagai 'approved' di halaman Manager
+                                            : approval.status;
+                                            
+                                        const StatusIcon = statusConfig[displayStatus]?.icon || Clock;
+
                                         return (
                                             <tr key={approval.noReg} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4">
@@ -649,9 +667,9 @@ export default function ApprovalPage() {
                                                     <p className="text-xs text-gray-500">s/d {approval.tanggalSelesai}</p>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${statusConfig[approval.status]?.color}`}>
+                                                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${statusConfig[displayStatus]?.color}`}>
                                                         <StatusIcon className="w-3 h-3" />
-                                                        {statusConfig[approval.status]?.label}
+                                                        {statusConfig[displayStatus]?.label}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -678,6 +696,7 @@ export default function ApprovalPage() {
                                                         )}
 
                                                         {/* Aksi Approve/Reject/Delete */}
+                                                        {/* Aksi Approve/Reject hanya muncul jika status asli di DB adalah 'pending' */}
                                                         {approval.status === 'pending' && (
                                                             <>
                                                                 <button

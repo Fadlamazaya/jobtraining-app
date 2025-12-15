@@ -1,9 +1,7 @@
 // src/components/ProtectedRoute.jsx
 
 import { Navigate } from "react-router-dom";
-// GANTI PATH INI:
-// import AccessDenied from "../pages/AccessDenied"; 
-import AccessDenied from "../pages/HalamanAdmintr/AccessDenied"; // <<< PATH YANG BENAR
+import AccessDenied from "../pages/HalamanAdmintr/AccessDenied"; 
 
 export default function ProtectedRoute({ children, allowedRoles }) {
     const userRole = localStorage.getItem("userRole");
