@@ -185,7 +185,7 @@ function App() {
             <Route
                 element={
                     <ProtectedRoute allowedRoles={["HR"]}>
-                        <HrLayout/>
+                        <HRLayout/>
                     </ProtectedRoute>
                 }
             >
